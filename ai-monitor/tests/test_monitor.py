@@ -466,3 +466,10 @@ def test_openai_compat_error_message_and_auth_header(monkeypatch):
     p.options["auth_header"] = "api-key"
     assert run(openai_compat.check, p, handler).status == "up"
     assert seen["api-key"] == "k" and "authorization" not in seen
+
+
+def test_openai_compat_masked_key(monkeypatch):
+    monkeypatch.setenv("T_KEY", "tp-abc*****xyz")
+    p = Provider("m", "M", "openai_compat", options={"base_url": "https://api/v1", "api_key_env": "T_KEY"})
+    r = run(openai_compat.check, p, lambda req: httpx.Response(200, json={"data": []}))
+    assert r.status == "down" and "Copy" in r.detail

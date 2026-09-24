@@ -52,6 +52,8 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     key = os.environ.get(env, "") if env else ""
     if env and not key:
         return CheckResult("unknown", f"ยังไม่ได้ใส่ {env} ใน .env")
+    if "*" in key or "…" in key:
+        return CheckResult("down", f"{env} มีเครื่องหมาย * (คัดลอกตัวที่เว็บปิดไว้) ให้กดปุ่ม Copy ในเว็บแล้ววางใหม่")
     # auth_header: "authorization" (default, "Bearer <key>") or a header name that takes the raw key, e.g. "api-key"
     auth = str(p.options.get("auth_header", "authorization")).lower()
     headers = ({"Authorization": f"Bearer {key}"} if auth == "authorization" else {auth: key}) if key else {}
