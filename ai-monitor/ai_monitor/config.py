@@ -56,7 +56,7 @@ def load_env(path: Path) -> None:
 
 
 def load_config(path: Path) -> Config:
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8-sig")) or {}
     defaults = {**DEFAULTS, **(raw.get("defaults") or {})}
     providers = []
     for item in raw.get("providers") or []:
