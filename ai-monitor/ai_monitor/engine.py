@@ -15,11 +15,16 @@ from .store import Store
 log = logging.getLogger(__name__)
 
 
+# Local services must never go through a system/VPN proxy (httpx picks those up from Windows settings).
+LOCAL_TYPES = {"ollama"}
+
+
 def _error_result(p: Provider, exc: Exception) -> CheckResult:
     # A status page we cannot reach says nothing about the service itself.
     status = "unknown" if p.type == "status_page" else "down"
     if isinstance(exc, httpx.ConnectError):
-        detail = "เชื่อมต่อไม่ได้" + (" (Ollama ไม่ได้รัน?)" if p.type == "ollama" else "")
+        where = f" {exc.request.url.host}:{exc.request.url.port}" if p.type in LOCAL_TYPES and _has_request(exc) else ""
+        detail = f"เชื่อมต่อ{where}ไม่ได้" + (" (Ollama ไม่ได้รัน?)" if p.type == "ollama" else "")
     elif isinstance(exc, httpx.TimeoutException):
         detail = f"ไม่ตอบภายใน {p.timeout_s:g} วินาที"
     elif isinstance(exc, httpx.HTTPStatusError):
@@ -27,6 +32,36 @@ def _error_result(p: Provider, exc: Exception) -> CheckResult:
     else:
         detail = f"{type(exc).__name__}: {exc}"[:200]
     return CheckResult(status, detail)
+
+
+def _has_request(exc: httpx.HTTPError) -> bool:
+    try:
+        return exc.request is not None
+    except RuntimeError:
+        return False
+
+
+async def _run_checker(p: Provider, client: httpx.AsyncClient) -> CheckResult:
+    try:
+        return await CHECKERS[p.type](p, client)
+    except Exception as exc:  # noqa: BLE001 - every failure becomes a status
+        log.debug("check %s failed", p.id, exc_info=True)
+        return _error_result(p, exc)
+
+
+def _clients() -> tuple[httpx.AsyncClient, httpx.AsyncClient]:
+    headers = {"User-Agent": "ai-monitor/0.1"}
+    return (httpx.AsyncClient(follow_redirects=True, headers=headers),
+            httpx.AsyncClient(trust_env=False, headers=headers))
+
+
+async def check_all(cfg: Config) -> list[tuple[Provider, CheckResult]]:
+    """Run every provider once (no debounce); used by `--check`."""
+    remote, local = _clients()
+    async with remote, local:
+        results = await asyncio.gather(*(_run_checker(p, local if p.type in LOCAL_TYPES else remote)
+                                         for p in cfg.providers))
+    return list(zip(cfg.providers, results))
 
 
 class Monitor:
@@ -37,11 +72,7 @@ class Monitor:
         self._fails: dict[str, int] = {}
 
     async def check_once(self, p: Provider, client: httpx.AsyncClient) -> dict[str, Any]:
-        try:
-            result = await CHECKERS[p.type](p, client)
-        except Exception as exc:  # noqa: BLE001 - every failure becomes a status
-            log.debug("check %s failed", p.id, exc_info=True)
-            result = _error_result(p, exc)
+        result = await _run_checker(p, client)
 
         # Only turn red after fail_threshold consecutive failures.
         if result.status == "down":
@@ -80,5 +111,7 @@ class Monitor:
             await asyncio.sleep(86400)
 
     async def run(self) -> None:
-        async with httpx.AsyncClient(follow_redirects=True, headers={"User-Agent": "ai-monitor/0.1"}) as client:
-            await asyncio.gather(self._purge_loop(), *(self._loop(p, client) for p in self.cfg.providers))
+        remote, local = _clients()
+        async with remote, local:
+            await asyncio.gather(self._purge_loop(), *(
+                self._loop(p, local if p.type in LOCAL_TYPES else remote) for p in self.cfg.providers))

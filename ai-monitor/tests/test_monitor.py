@@ -80,17 +80,72 @@ def test_openai_compat_probe_sends_one_token(monkeypatch):
     assert len(sent) == 1 and sent[0]["max_tokens"] == 1
 
 
-def test_ollama():
+def test_ollama_states():
+    from ai_monitor.checkers import ollama as ol
+    ol._speed.clear()
+    expires = "2030-01-01T00:00:00Z"
+    loaded = []
+    generated = []
+
     def handler(req):
         if req.url.path == "/api/tags":
-            return httpx.Response(200, json={"models": [{"name": "qwen3.5:14b"}, {"name": "llama3"}]})
-        return httpx.Response(200, json={"models": [{"name": "qwen3.5:14b", "size_vram": 2 * 1024**3}]})
+            return httpx.Response(200, json={"models": [
+                {"name": "qwen3.5:14b", "size": 9 * 1024**3, "details": {"parameter_size": "14.8B", "quantization_level": "Q4_K_M"}},
+                {"name": "llama3"}]})
+        if req.url.path == "/api/version":
+            return httpx.Response(200, json={"version": "0.12.1"})
+        if req.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": loaded})
+        if req.url.path == "/api/generate":
+            generated.append(json.loads(req.content))
+            return httpx.Response(200, json={"eval_count": 16, "eval_duration": 400_000_000})
+        return httpx.Response(404)
 
     p = Provider("q", "Q", "ollama", options={"model_hint": "qwen3.5"})
-    r = run(ollama.check, p, handler)
-    assert (r.status, r.extra["loaded"], r.extra["vram_gb"]) == ("up", True, 2.0)
+    r = run(ol.check, p, handler)
+    assert (r.status, r.extra["state"], r.extra["quant"], r.extra["ollama_version"]) == ("up", "ready", "Q4_K_M", "0.12.1")
+    assert not generated  # never loads a model just to measure it
+
+    loaded.append({"name": "qwen3.5:14b", "size": 10 * 1024**3, "size_vram": 8 * 1024**3,
+                   "expires_at": expires, "context_length": 8192})
+    r = run(ol.check, p, handler)
+    x = r.extra
+    assert (x["state"], x["gpu_pct"], x["vram_gb"], x["tok_s"], x["context"]) == ("active", 80, 8.0, 40.0, 8192)
+    assert "CPU 20%" in r.detail
+    assert generated[0]["options"]["num_predict"] == 16 and generated[0]["keep_alive"].endswith("s")
+    run(ol.check, p, handler)
+    assert len(generated) == 1  # probe interval respected
+
     p.options["model_hint"] = "sparkx"
-    assert run(ollama.check, p, handler).status == "down"
+    r = run(ol.check, p, handler)
+    assert (r.status, r.extra["state"]) == ("degraded", "missing")
+    assert "qwen3.5:14b" in r.detail
+
+
+def test_ollama_base_url(monkeypatch):
+    from ai_monitor.checkers.ollama import base_url
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    assert base_url("auto") == "http://127.0.0.1:11434"
+    assert base_url("http://box:1234/") == "http://box:1234"
+    for env, want in [("0.0.0.0", "http://127.0.0.1:11434"), ("0.0.0.0:9999", "http://127.0.0.1:9999"),
+                      (":8080", "http://127.0.0.1:8080"), ("http://192.168.1.5:11434", "http://192.168.1.5:11434")]:
+        monkeypatch.setenv("OLLAMA_HOST", env)
+        assert base_url(None) == want, env
+
+
+def test_check_all_uses_proxy_free_client_for_local(monkeypatch):
+    from ai_monitor import engine
+    seen = {}
+
+    async def fake(p, client):
+        seen[p.id] = client._trust_env
+        return CheckResult("up")
+
+    monkeypatch.setitem(checkers.CHECKERS, "ollama", fake)
+    monkeypatch.setitem(checkers.CHECKERS, "fake", fake)
+    cfg = Config(providers=[Provider("o", "O", "ollama"), Provider("r", "R", "fake")])
+    asyncio.run(engine.check_all(cfg))
+    assert seen == {"o": False, "r": True}
 
 
 def make_hermes_home(tmp_path: Path, pid: int) -> Path:

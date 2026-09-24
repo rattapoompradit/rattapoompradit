@@ -9,7 +9,7 @@ Dashboard สำหรับดูสถานะ AI ทุกตัว + Status
 | Agent | Hermes Agent | อ่านไฟล์ใน `%LOCALAPPDATA%\hermes` แบบอ่านอย่างเดียว: gateway, ช่องทาง, model, sessions, cron, error |
 | Cloud | ChatGPT, Claude | status page ทางการ + **แถบโควตา 5 ชม. / สัปดาห์** จากการล็อกอินของ Codex CLI / Claude Code |
 | Cloud / Free | MiMo, Z.ai GLM Flash, Nemotron 3 | `GET /models` ด้วย API key ใน `.env` แล้วหาชื่อโมเดลจาก `model_hint` ให้อัตโนมัติ |
-| Local | Sparkx 2.5, Qwen 3.5 | Ollama `/api/tags` + `/api/ps` (ติดตั้งอยู่ไหม, โหลดเข้า VRAM หรือยัง) |
+| Local | Sparkx 2.5, Qwen 3.5 | Ollama: **ACTIVE** (โหลดอยู่: VRAM, สัดส่วน GPU/CPU, tokens/sec, เวลาที่จะปล่อย VRAM) · **READY** (ติดตั้งแล้ว ยังไม่โหลด = ปกติ) · **MISSING** (ชื่อไม่ตรง แสดงรายชื่อโมเดลที่มี) · **OFFLINE** (Ollama ไม่ได้รัน) |
 | Local | GPU (NVIDIA) | `nvidia-smi` ทุก 10 วินาที: อุณหภูมิ, VRAM, Utilization, Power, Fan + โมเดลไหนโหลดอยู่ใน VRAM |
 
 **UX บนจอ Xeneon Edge (ทัชสกรีน)**
@@ -58,6 +58,19 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 ถ้าไปขึ้นผิดจอ ดูตำแหน่งจอใน **Settings → System → Display** (ถ้าวาง Xeneon Edge ไว้ใต้จอหลัก ปกติจะเป็น `0` กับความสูงของจอหลัก เช่น `1440`) แล้วแก้ 2 บรรทัดนี้ใน `run.bat`
 
 เปิดอัตโนมัติตอนเปิดเครื่องแบบทำเอง: กด `Win+R` → `shell:startup` → สร้าง shortcut ไปที่ `run.bat`
+
+## แก้ปัญหา
+
+ดับเบิลคลิก **`check.bat`** จะเช็คทุกตัวครั้งเดียวแล้วแสดงสาเหตุ เช่น
+
+```
+[OK  ] Qwen 3.5         โหลดอยู่ใน VRAM 10.8 GB (35 ms)
+[WARN] Sparkx 2.5       ไม่พบโมเดล 'spark' ใน Ollama (มี: qwen3.5:14b, sparkx-v2:8b)
+[DOWN] GPU              nvidia-smi error: ...
+```
+
+- Local AI ขึ้น OFFLINE: เปิด Ollama ก่อน (ไอคอนที่ taskbar) ถ้าตั้ง `OLLAMA_HOST` ไว้ โปรแกรมจะใช้ค่านั้นเอง (`base_url: auto`)
+- ขึ้น MISSING: แก้ `model_hint` ใน `config.yaml` ให้เป็นคำที่อยู่ในชื่อโมเดลตามที่การ์ดแสดง
 
 ## ปรับแต่ง
 

@@ -66,14 +66,15 @@ providers:
     name: Sparkx 2.5
     group: Local
     type: ollama
-    base_url: http://localhost:11434
+    base_url: auto            # auto = ใช้ OLLAMA_HOST ถ้าตั้งไว้ ไม่งั้น http://127.0.0.1:11434
     model_hint: spark         # แก้ให้ตรงกับชื่อใน `ollama list`
+    # speed_probe: false      # ปิดการวัด tokens/sec (วัดเฉพาะตอนโมเดลโหลดอยู่แล้ว ทุก 10 นาที, 16 tokens)
 
   - id: qwen
     name: Qwen 3.5
     group: Local
     type: ollama
-    base_url: http://localhost:11434
+    base_url: auto
     model_hint: qwen3.5
 
   - id: gpu

@@ -2,6 +2,15 @@ const REFRESH_MS = 10000;
 const MODAL_AUTOCLOSE_MS = 20000;
 const LABEL = { up: "ปกติ", degraded: "มีปัญหา", down: "ล่ม", unknown: "ไม่ทราบ" };
 const CODE = { up: "ONLINE", degraded: "WARNING", down: "OFFLINE", unknown: "STANDBY" };
+// Local models: being idle (READY) is normal, so it gets its own calm state instead of a status color.
+const LOCAL = {
+  active: { code: "ACTIVE", label: "โหลดอยู่ใน VRAM" },
+  ready: { code: "READY", label: "พร้อมใช้" },
+  missing: { code: "MISSING", label: "ไม่พบโมเดล" },
+};
+const localState = (p) => (p.type === "ollama" && p.status !== "down" && p.extra ? LOCAL[p.extra.state] : null);
+const codeFor = (p) => (localState(p) || { code: CODE[p.status] }).code;
+const statusClass = (p) => (p.type === "ollama" && p.status === "up" && p.extra && p.extra.state === "ready" ? "s-ready" : `s-${p.status}`);
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (n) => (n ?? 0).toLocaleString("en-US");
@@ -75,7 +84,44 @@ function head(p, tag = p.group) {
 }
 
 const stateLine = (p) =>
-  `<div class="state"><span class="code">${CODE[p.status]}</span><span class="th">${LABEL[p.status]}${p.since ? ` · ${ago(p.since)}` : ""}</span></div>`;
+  `<div class="state"><span class="code">${codeFor(p)}</span><span class="th">${(localState(p) || { label: LABEL[p.status] }).label}${p.since ? ` · ${ago(p.since)}` : ""}</span></div>`;
+
+function unloadText(exp) {
+  const s = exp - Date.now() / 1000;
+  if (s > 86400) return "ค้างอยู่ใน VRAM ตลอด";
+  if (s <= 0) return "กำลังปล่อย VRAM…";
+  return `ปล่อย VRAM ใน <b>${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}</b>`;
+}
+
+function localInner(p) {
+  const x = p.extra || {};
+  const spec = [x.params, x.quant].filter(Boolean).join(" · ");
+  const api = p.latency_ms != null ? stat("API", num(p.latency_ms), "ms") : "";
+  let body;
+  if (x.state === "active" && p.status !== "down") {
+    const gpu = x.gpu_pct ?? 100;
+    body = `<div class="split">
+        <div class="split-head"><span>GPU <b>${gpu}%</b></span>${gpu < 100
+          ? `<span class="warn">CPU <b>${100 - gpu}%</b> · ช้าลง</span>` : `<span>VRAM <b>${x.vram_gb} GB</b></span>`}</div>
+        <div class="split-track"><div class="split-gpu" style="width:${gpu}%"></div><div class="split-cpu" style="width:${100 - gpu}%"></div></div>
+      </div>
+      <div class="stats">${x.tok_s != null ? stat("SPEED", x.tok_s, "tok/s") : ""}${x.context ? stat("CTX", num(x.context)) : ""}${api}</div>
+      ${x.expires_at ? `<div class="unload" data-exp="${x.expires_at}">${unloadText(x.expires_at)}</div>` : ""}`;
+  } else if (x.state === "ready" && p.status !== "down") {
+    body = `<div class="stats">${x.disk_gb ? stat("SIZE", x.disk_gb, "GB") : ""}${api}${p.uptime_24h != null ? stat("24H", `${p.uptime_24h}%`) : ""}</div>
+      <div class="idle-note">◇ ไม่ได้ใช้ VRAM ตอนนี้ · โหลดเองเมื่อมีการเรียกใช้</div>`;
+  } else if (x.state === "missing" && p.status !== "down") {
+    body = `<div class="idle-note">โมเดลที่มีใน Ollama (แก้ model_hint ใน config.yaml):</div>
+      <div class="chips">${(x.available || []).slice(0, 6).map((n) => `<span class="chip idle">${esc(n)}</span>`).join("") || `<span class="chip idle">ยังไม่มีโมเดล</span>`}</div>`;
+  } else {
+    body = `<div class="idle-note">เปิด Ollama แล้วรอสักครู่ หรือรัน check.bat เพื่อดูสาเหตุ</div>`;
+  }
+  return `${head(p)}${stateLine(p)}
+    <div class="detail" title="${esc(p.detail)}">${esc(p.detail)}</div>
+    ${x.model ? `<div class="sub" title="${esc(x.model)}">${esc(x.model)}${spec ? ` · ${esc(spec)}` : ""}</div>` : ""}
+    ${body}
+    ${x.ollama_version ? `<div class="foot">OLLAMA ${esc(x.ollama_version)} · ${esc(x.server)}</div>` : ""}`;
+}
 
 /* ---------- cards ---------- */
 
@@ -154,12 +200,13 @@ function hermesInner(p) {
 function inner(p, providers) {
   if (p.type === "hermes") return hermesInner(p);
   if (p.type === "gpu") return gpuInner(p, providers);
+  if (p.type === "ollama") return localInner(p);
   return providerInner(p);
 }
 
 function card(p, providers) {
   const stale = isStale(p);
-  return `<article class="card type-${p.type} s-${p.status}${stale ? " stale" : ""}" data-id="${esc(p.id)}">
+  return `<article class="card type-${p.type} ${statusClass(p)}${stale ? " stale" : ""}" data-id="${esc(p.id)}">
     ${inner(p, providers)}${stale ? `<span class="stale-badge">ข้อมูลเก่า ${ago(p.checked_at)}</span>` : ""}</article>`;
 }
 
@@ -196,7 +243,7 @@ function openModal(id) {
   const unit = p.type === "gpu" ? "°C" : "ms";
   const hist = (p.history || []).filter((v) => v != null);
   const rows = [
-    ["สถานะ", `${CODE[p.status]} · ${LABEL[p.status]}${p.since ? ` ตั้งแต่ ${clock(p.since)}` : ""}`],
+    ["สถานะ", `${codeFor(p)} · ${(localState(p) || { label: LABEL[p.status] }).label}${p.since ? ` ตั้งแต่ ${clock(p.since)}` : ""}`],
     ["รายละเอียด", p.detail],
     p.extra && p.extra.incident ? ["เหตุการณ์", p.extra.incident] : null,
     ["เช็คล่าสุด", p.checked_at ? `${clockSec(p.checked_at)} · ทุก ${p.interval_s} วินาที` : "-"],
@@ -204,7 +251,7 @@ function openModal(id) {
     hist.length ? ["ประวัติ", `ต่ำสุด ${Math.min(...hist)} · สูงสุด ${Math.max(...hist)} ${unit}`] : null,
   ].filter(Boolean);
   const modal = document.getElementById("modal");
-  modal.innerHTML = `<div class="card modal-card type-${p.type} s-${p.status}">
+  modal.innerHTML = `<div class="card modal-card type-${p.type} ${statusClass(p)}">
     <div class="modal-main">${inner(p, last.providers)}</div>
     <aside class="modal-side">
       <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
@@ -255,6 +302,7 @@ function tick() {
   const now = new Date();
   document.getElementById("clock").textContent = now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   document.getElementById("date").textContent = now.toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short" });
+  document.querySelectorAll(".unload[data-exp]").forEach((el) => { el.innerHTML = unloadText(+el.dataset.exp); });
   const h = now.getHours();
   document.documentElement.classList.toggle("night", h >= 23 || h < 7); // dim the always-on screen at night
 }
