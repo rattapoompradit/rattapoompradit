@@ -169,3 +169,57 @@ def test_api_and_page():
         assert data["providers"][0]["status"] == "unknown"
         assert "AI Monitor" in client.get("/").text
         assert client.get("/static/app.js").status_code == 200
+
+
+def test_usage_claude_code(tmp_path, monkeypatch):
+    from ai_monitor.checkers import usage
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path))
+    usage._cache.clear()
+    assert "ไม่พบ" in asyncio.run(usage.claude_code(None, 5))["error"]
+
+    creds = {"claudeAiOauth": {"accessToken": "tok", "expiresAt": (time.time() + 3600) * 1000, "subscriptionType": "max"}}
+    (tmp_path / ".credentials.json").write_text(json.dumps(creds))
+    seen = {}
+
+    def handler(req):
+        seen.update(auth=req.headers["authorization"], beta=req.headers["anthropic-beta"])
+        return httpx.Response(200, json={"five_hour": {"utilization": 42.4, "resets_at": "2030-01-01T00:00:00Z"},
+                                         "seven_day": {"utilization": 10, "resets_at": None}, "seven_day_opus": None})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await usage.fetch("claude_code", client, 5)
+    out = asyncio.run(go())
+    assert seen == {"auth": "Bearer tok", "beta": "oauth-2025-04-20"}
+    assert out["plan"] == "max"
+    assert [(b["label"], b["used_pct"]) for b in out["bars"]] == [("5 ชม.", 42), ("สัปดาห์", 10)]
+    assert out["bars"][0]["resets_at"] == 1893456000
+
+    creds["claudeAiOauth"]["expiresAt"] = 1000
+    (tmp_path / ".credentials.json").write_text(json.dumps(creds))
+    assert "หมดอายุ" in asyncio.run(usage.claude_code(None, 5))["error"]
+
+
+def test_usage_codex_and_status_page_integration(tmp_path, monkeypatch):
+    from ai_monitor.checkers import usage
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    usage._cache.clear()
+    (tmp_path / "auth.json").write_text(json.dumps({"tokens": {"access_token": "t", "account_id": "acc"}}))
+
+    def handler(req):
+        if req.url.host == "chatgpt.com":
+            assert req.headers["chatgpt-account-id"] == "acc"
+            return httpx.Response(200, json={"plan_type": "plus", "rate_limit": {
+                "primary_window": {"used_percent": 100, "limit_window_seconds": 18000, "reset_after_seconds": 60, "reset_at": 1893456000},
+                "secondary_window": {"used_percent": 30, "limit_window_seconds": 604800, "reset_after_seconds": 60, "reset_at": 1893456000}}})
+        return httpx.Response(200, json={"status": {"indicator": "none", "description": "All good"}})
+
+    p = Provider("chatgpt", "ChatGPT", "status_page", options={"url": "https://status/summary.json", "usage": "codex"})
+    r = run(status_page.check, p, handler)
+    assert [(b["label"], b["used_pct"]) for b in r.extra["usage"]["bars"]] == [("5 ชม.", 100), ("สัปดาห์", 30)]
+    assert (r.status, r.detail) == ("degraded", "ใช้โควตา 5 ชม. หมดแล้ว")
+
+    usage._cache.clear()
+    (tmp_path / "auth.json").write_text("{}")
+    r = run(status_page.check, p, lambda req: httpx.Response(503))
+    assert r.status == "unknown" and "Codex" in r.extra["usage"]["error"]

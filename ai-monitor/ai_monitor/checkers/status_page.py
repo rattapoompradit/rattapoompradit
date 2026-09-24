@@ -1,4 +1,5 @@
-"""Official status pages in Atlassian Statuspage format (/api/v2/summary.json)."""
+"""Official status pages in Atlassian Statuspage format (/api/v2/summary.json),
+plus optional subscription usage bars (option `usage: claude_code | codex`)."""
 
 import time
 
@@ -6,6 +7,7 @@ import httpx
 
 from ..config import Provider
 from ..models import CheckResult
+from . import usage
 
 INDICATOR = {"none": "up", "minor": "degraded", "maintenance": "degraded", "major": "down", "critical": "down"}
 COMPONENT = {
@@ -18,6 +20,23 @@ COMPONENT = {
 
 
 async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
+    source = p.options.get("usage")
+    if not source:
+        return await _status(p, client)
+    quota = await usage.fetch(source, client, p.timeout_s, float(p.options.get("usage_interval_s", 300)))
+    try:
+        result = await _status(p, client)
+    except (httpx.HTTPError, ValueError) as exc:
+        result = CheckResult("unknown", f"เข้า status page ไม่ได้ ({type(exc).__name__})")
+    result.extra["usage"] = quota
+    full = [b for b in quota.get("bars", []) if b["used_pct"] >= 100]
+    if full and result.status == "up":
+        result.status = "degraded"
+        result.detail = f"ใช้โควตา {full[0]['label']} หมดแล้ว"
+    return result
+
+
+async def _status(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     started = time.monotonic()
     r = await client.get(p.options["url"], timeout=p.timeout_s)
     latency = int((time.monotonic() - started) * 1000)

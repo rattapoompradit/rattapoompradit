@@ -18,13 +18,14 @@ providers:
     home: auto              # auto = %LOCALAPPDATA%\hermes (Windows) หรือ ~/.hermes
     gateway_required: true  # ถ้าใช้แต่ CLI ไม่ได้เปิด gateway ให้ตั้งเป็น false
 
-  # ChatGPT / Claude ใช้แบบ subscription จึงเช็คจาก status page ทางการ (ไม่ใช้ key ไม่เสีย token)
+  # ChatGPT / Claude ใช้แบบ subscription: สถานะจาก status page ทางการ + แถบโควตา (ไม่เสีย token)
   - id: chatgpt
     name: ChatGPT
     group: Cloud
     type: status_page
     url: https://status.openai.com/api/v2/summary.json
     component: ChatGPT
+    usage: codex              # แถบโควตา 5 ชม./สัปดาห์ จากการล็อกอิน Codex CLI (ลบบรรทัดนี้ถ้าไม่ใช้)
 
   - id: claude
     name: Claude
@@ -32,6 +33,7 @@ providers:
     type: status_page
     url: https://status.anthropic.com/api/v2/summary.json
     component: claude.ai
+    usage: claude_code        # แถบโควตา 5 ชม./สัปดาห์ จากการล็อกอิน Claude Code (ลบบรรทัดนี้ถ้าไม่ใช้)
 
   # model_hint = คำที่อยู่ในชื่อโมเดล ระบบจะหาชื่อจริงจาก /models ให้เอง
   - id: mimo

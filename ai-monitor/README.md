@@ -7,7 +7,7 @@ Dashboard สำหรับดูสถานะ AI ทุกตัว + Status
 | กลุ่ม | ตัว | วิธีเช็ค (ไม่เสีย token) |
 |------|-----|---------------------------|
 | Agent | Hermes Agent | อ่านไฟล์ใน `%LOCALAPPDATA%\hermes` แบบอ่านอย่างเดียว: gateway, ช่องทาง, model, sessions, cron, error |
-| Cloud | ChatGPT, Claude | status page ทางการ (ใช้แบบ subscription จึงไม่ต้องมี key) |
+| Cloud | ChatGPT, Claude | status page ทางการ + **แถบโควตา 5 ชม. / สัปดาห์** จากการล็อกอินของ Codex CLI / Claude Code |
 | Cloud / Free | MiMo, Z.ai GLM Flash, Nemotron 3 | `GET /models` ด้วย API key ใน `.env` แล้วหาชื่อโมเดลจาก `model_hint` ให้อัตโนมัติ |
 | Local | Sparkx 2.5, Qwen 3.5 | Ollama `/api/tags` + `/api/ps` (ติดตั้งอยู่ไหม, โหลดเข้า VRAM หรือยัง) |
 
@@ -25,6 +25,16 @@ Dashboard สำหรับดูสถานะ AI ทุกตัว + Status
    ```
 3. ใช้งานจริง: ใส่ API key ใน `.env` (สร้างให้อัตโนมัติจาก `.env.example`) แล้วรัน `run.bat`
 4. ดูชื่อโมเดลด้วย `ollama list` แล้วแก้ `model_hint` ของ Sparkx / Qwen ใน `config.yaml` ให้ตรง
+
+### แถบโควตา ChatGPT / Claude
+
+ใช้การล็อกอิน subscription ที่มีอยู่แล้วในเครื่อง (อ่านอย่างเดียว ไม่ต่ออายุ token เอง และส่ง token ไปที่ผู้ให้บริการเจ้าของเท่านั้น)
+
+- **Claude:** ติดตั้ง [Claude Code](https://claude.com/claude-code) แล้วรัน `claude` ล็อกอินด้วยบัญชี Pro/Max (อ่านจาก `%USERPROFILE%\.claude\.credentials.json`)
+- **ChatGPT:** ติดตั้ง Codex CLI (`npm i -g @openai/codex`) แล้วรัน `codex login` ด้วยบัญชี ChatGPT (อ่านจาก `%USERPROFILE%\.codex\auth.json`)
+- ถ้าขึ้นว่า token หมดอายุ ให้เปิด Claude Code / Codex สักครั้ง
+- endpoint ที่ใช้ไม่ใช่ API ทางการ ถ้าผู้ให้บริการเปลี่ยน แถบจะขึ้นข้อความ error แทน (ส่วนสถานะยังทำงาน) ไม่อยากใช้ให้ลบบรรทัด `usage:` ใน `config.yaml`
+- สีแถบ: เขียว < 70%, เหลือง 70–89%, แดง ≥ 90% และถ้าใช้หมด 100% การ์ดจะเป็น WARNING
 
 ### ให้ขึ้นบนจอ Xeneon Edge
 
