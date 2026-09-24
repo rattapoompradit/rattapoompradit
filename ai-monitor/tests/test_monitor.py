@@ -473,3 +473,36 @@ def test_openai_compat_masked_key(monkeypatch):
     p = Provider("m", "M", "openai_compat", options={"base_url": "https://api/v1", "api_key_env": "T_KEY"})
     r = run(openai_compat.check, p, lambda req: httpx.Response(200, json={"data": []}))
     assert r.status == "down" and "Copy" in r.detail
+
+
+def test_api_key_from_hermes(tmp_path, monkeypatch):
+    from ai_monitor.checkers.openai_compat import resolve_key
+    home = tmp_path / "hermes"
+    home.mkdir()
+    (home / ".env").write_text("\ufeffXIAOMI_API_KEY=tp-hermes\nexport XIAOMI_BASE_URL=https://token-plan-sgp.x/v1/\n", encoding="utf-8")
+    opts = {"base_url": "https://api.x/v1", "api_key_env": "MIMO_API_KEY", "_hermes_home": str(home)}
+
+    monkeypatch.setenv("MIMO_API_KEY", "own-key")
+    assert resolve_key(Provider("m", "M", "openai_compat", options=dict(opts))) == ("own-key", "https://api.x/v1", ".env")
+    assert resolve_key(Provider("m", "M", "openai_compat", options={**opts, "key_from": "hermes"})) == (
+        "tp-hermes", "https://token-plan-sgp.x/v1", "Hermes")
+    monkeypatch.delenv("MIMO_API_KEY")
+    assert resolve_key(Provider("m", "M", "openai_compat", options=dict(opts)))[2] == "Hermes"  # auto falls back
+    assert resolve_key(Provider("m", "M", "openai_compat", options={**opts, "key_from": "env"}))[0] == ""
+
+    seen = {}
+
+    def handler(req):
+        seen["url"], seen["auth"] = str(req.url), req.headers["authorization"]
+        return httpx.Response(200, json={"data": [{"id": "mimo-v2.6-pro"}]})
+
+    r = run(openai_compat.check, Provider("m", "M", "openai_compat", options={**opts, "model_hint": "mimo"}), handler)
+    assert r.status == "up" and r.detail.endswith("key จาก Hermes")
+    assert seen == {"url": "https://token-plan-sgp.x/v1/models", "auth": "Bearer tp-hermes"}
+
+
+def test_config_passes_hermes_home_to_api_checks(tmp_path):
+    (tmp_path / "c.yaml").write_text(
+        "providers:\n  - {id: h, type: hermes, home: 'D:/h'}\n  - {id: m, type: openai_compat, base_url: 'x'}\n", encoding="utf-8")
+    cfg = load_config(tmp_path / "c.yaml")
+    assert cfg.providers[1].options["_hermes_home"] == "D:/h"

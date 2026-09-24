@@ -44,6 +44,14 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 - เปิดใหม่: ดับเบิลคลิก `run.bat` (ข้อมูลจริง) หรือ `run.bat --demo` (ข้อมูลสมมติ)
 - ปิด: Alt+F4 ที่หน้าจอ และปิดหน้าต่าง "AI Monitor" ที่ย่ออยู่ใน taskbar
 
+### ใช้ API key เดียวกับ Hermes
+
+การ์ด MiMo / Z.ai / Nemotron ใช้ key ใน `.env` ของ AI Monitor ก่อน ถ้าว่างจะใช้ key ที่ Hermes ใช้อยู่ (`%LOCALAPPDATA%\\hermes\\.env`: `XIAOMI_API_KEY`, `GLM_API_KEY`, `NVIDIA_API_KEY`) โดยอ่านอย่างเดียว
+
+- `key_from: hermes` ใช้ของ Hermes ก่อนเสมอ พร้อม base URL ของ Hermes (`XIAOMI_BASE_URL` ฯลฯ) ถ้าตั้งไว้ — ค่าเริ่มต้นของ MiMo
+- `key_from: env` ใช้เฉพาะ `.env` ของ AI Monitor
+- การ์ดจะบอกท้ายข้อความว่า "key จาก Hermes" เมื่อใช้ key ของ Hermes
+
 ### แถบโควตา ChatGPT / Claude
 
 ใช้การล็อกอิน subscription ที่มีอยู่แล้วในเครื่อง (อ่านอย่างเดียว ไม่ต่ออายุ token เอง และส่ง token ไปที่ผู้ให้บริการเจ้าของเท่านั้น)

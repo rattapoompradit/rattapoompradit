@@ -54,6 +54,7 @@ providers:
     # จ่ายตามการใช้ (key ปกติ): https://api.xiaomimimo.com/v1
     base_url: https://token-plan-sgp.xiaomimimo.com/v1
     api_key_env: MIMO_API_KEY
+    key_from: hermes          # ใช้ XIAOMI_API_KEY / XIAOMI_BASE_URL ของ Hermes ก่อน (ถ้ามี) ไม่งั้นใช้ MIMO_API_KEY ใน .env
     interval_s: 300           # แพ็กเกจนี้สำหรับใช้งานแบบโต้ตอบ: เช็คแค่รายชื่อโมเดลทุก 5 นาที ไม่ส่ง prompt
     # auth_header: api-key    # ถ้า MiMo ต้องส่ง key ใน header "api-key" แทน "Authorization: Bearer"
     model_hint: mimo

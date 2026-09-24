@@ -34,16 +34,25 @@ class Config:
     router: dict[str, Any] = field(default_factory=dict)  # Hermes Router status source (router_status.py)
 
 
-def load_env(path: Path) -> None:
-    """Minimal KEY=VALUE loader; real environment variables win."""
+def read_env_file(path: Path) -> dict[str, str]:
+    """Minimal KEY=VALUE parser (comments, blank lines, quotes, `export ` prefix, Notepad BOM)."""
+    values: dict[str, str] = {}
     if not path.is_file():
-        return
-    for line in path.read_text(encoding="utf-8-sig").splitlines():  # Notepad may add a BOM
+        return values
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+        key = key.strip().removeprefix("export ").strip()
+        values[key] = value.strip().strip("\"'")
+    return values
+
+
+def load_env(path: Path) -> None:
+    """Load a .env file into the environment; real environment variables win."""
+    for key, value in read_env_file(path).items():
+        os.environ.setdefault(key, value)
 
 
 def load_config(path: Path) -> Config:
@@ -60,6 +69,11 @@ def load_config(path: Path) -> Config:
             options={k: v for k, v in item.items() if k not in _PROVIDER_KEYS},
             **values,
         ))
+    # API checks may fall back to the keys Hermes already uses (its own .env), see checkers/openai_compat.py
+    hermes_p = next((p for p in providers if p.type == "hermes"), None)
+    for p in providers:
+        if p.type == "openai_compat":
+            p.options.setdefault("_hermes_home", (hermes_p.options.get("home") if hermes_p else None) or "auto")
     db_path = Path(raw.get("db_path", "ai-monitor.db"))
     if not db_path.is_absolute():
         db_path = path.parent / db_path
