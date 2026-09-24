@@ -449,3 +449,20 @@ def test_router_api():
     app = create_app(cfg, store=Store(":memory:"), start=False, router_reader=lambda: {"available": False, "note": "x"})
     with TestClient(app) as client:
         assert client.get("/api/router").json() == {"available": False, "note": "x"}
+
+
+def test_openai_compat_error_message_and_auth_header(monkeypatch):
+    monkeypatch.setenv("T_KEY", "k")
+    p = Provider("m", "M", "openai_compat", options={"base_url": "https://api/v1", "api_key_env": "T_KEY"})
+    r = run(openai_compat.check, p, lambda req: httpx.Response(401, json={"error": {"message": "Invalid API key"}}))
+    assert r.detail == "API key ใช้ไม่ได้ (HTTP 401: Invalid API key)"
+
+    seen = {}
+
+    def handler(req):
+        seen.update(req.headers)
+        return httpx.Response(200, json={"data": [{"id": "mimo-v2"}]})
+
+    p.options["auth_header"] = "api-key"
+    assert run(openai_compat.check, p, handler).status == "up"
+    assert seen["api-key"] == "k" and "authorization" not in seen

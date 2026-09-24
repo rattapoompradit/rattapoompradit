@@ -52,6 +52,7 @@ providers:
     type: openai_compat
     base_url: https://api.xiaomimimo.com/v1
     api_key_env: MIMO_API_KEY
+    # auth_header: api-key    # ถ้า MiMo ต้องส่ง key ใน header "api-key" แทน "Authorization: Bearer"
     model_hint: mimo
 
   - id: glm

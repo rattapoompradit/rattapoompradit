@@ -11,14 +11,30 @@ from ..models import CheckResult
 _last_probe: dict[str, float] = {}
 
 
-def _http_problem(code: int) -> CheckResult | None:
+def _server_message(r: httpx.Response) -> str:
+    """The provider's own error text (e.g. "Invalid API key"), shortened; never includes our request."""
+    try:
+        data = r.json()
+    except ValueError:
+        return r.text.strip()[:120]
+    if isinstance(data, dict):
+        err = data.get("error", data)
+        msg = err.get("message") or err.get("msg") or err.get("detail") if isinstance(err, dict) else err
+        return str(msg or "").strip()[:120]
+    return ""
+
+
+def _http_problem(r: httpx.Response) -> CheckResult | None:
+    code = r.status_code
+    if code < 400:
+        return None
+    msg = _server_message(r)
+    suffix = f": {msg}" if msg else ""
     if code in (401, 403):
-        return CheckResult("down", f"API key ใช้ไม่ได้ (HTTP {code})")
+        return CheckResult("down", f"API key ใช้ไม่ได้ (HTTP {code}{suffix})")
     if code == 429:
-        return CheckResult("degraded", "โดน rate limit (HTTP 429)")
-    if code >= 400:
-        return CheckResult("down", f"HTTP {code}")
-    return None
+        return CheckResult("degraded", f"โดน rate limit (HTTP 429{suffix})")
+    return CheckResult("down", f"HTTP {code}{suffix}")
 
 
 def _quota(headers: httpx.Headers) -> int | None:
@@ -36,13 +52,15 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     key = os.environ.get(env, "") if env else ""
     if env and not key:
         return CheckResult("unknown", f"ยังไม่ได้ใส่ {env} ใน .env")
-    headers = {"Authorization": f"Bearer {key}"} if key else {}
+    # auth_header: "authorization" (default, "Bearer <key>") or a header name that takes the raw key, e.g. "api-key"
+    auth = str(p.options.get("auth_header", "authorization")).lower()
+    headers = ({"Authorization": f"Bearer {key}"} if auth == "authorization" else {auth: key}) if key else {}
     base = p.options["base_url"].rstrip("/")
 
     started = time.monotonic()
     r = await client.get(f"{base}/models", headers=headers, timeout=p.timeout_s)
     latency = int((time.monotonic() - started) * 1000)
-    if problem := _http_problem(r.status_code):
+    if problem := _http_problem(r):
         problem.latency_ms = latency
         return problem
 
@@ -68,7 +86,7 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
             timeout=p.timeout_s,
         )
         latency = int((time.monotonic() - started) * 1000)
-        if problem := _http_problem(r.status_code):
+        if problem := _http_problem(r):
             problem.latency_ms = latency
             problem.extra = extra
             return problem
