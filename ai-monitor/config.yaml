@@ -50,8 +50,11 @@ providers:
     name: MiMo
     group: Cloud
     type: openai_compat
-    base_url: https://api.xiaomimimo.com/v1
+    # Token Plan (key ขึ้นต้น tp-): ใช้ "Dedicated Base URL" จากหน้า Plan usage ของ MiMo
+    # จ่ายตามการใช้ (key ปกติ): https://api.xiaomimimo.com/v1
+    base_url: https://token-plan-sgp.xiaomimimo.com/v1
     api_key_env: MIMO_API_KEY
+    interval_s: 300           # แพ็กเกจนี้สำหรับใช้งานแบบโต้ตอบ: เช็คแค่รายชื่อโมเดลทุก 5 นาที ไม่ส่ง prompt
     # auth_header: api-key    # ถ้า MiMo ต้องส่ง key ใน header "api-key" แทน "Authorization: Bearer"
     model_hint: mimo
 
