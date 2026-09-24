@@ -28,8 +28,12 @@ SAMPLES = {
         "console_url": "https://platform.xiaomimimo.com/#/console/plan-manage",
         "bars": [{"label": "Credits (ประมาณ)", "used_pct": 18.4, "used": 754_000_000,
                   "total": 4_100_000_000, "resets_at": time.time() + 28 * 86400}]}}),
-    "glm": ("degraded", "โดน rate limit (HTTP 429)", 950, {"model": "glm-4.5-flash", "quota_pct": 6}),
-    "nemotron": ("up", "API ใช้ได้", 640, {"model": "nvidia/nemotron-3-nano", "quota_pct": 72}),
+    "glm": ("degraded", "โดน rate limit (HTTP 429)", 950, {"model": "glm-4.5-flash", "daily": {
+        "requests": 842, "tokens": 1_260_000, "limits": {"requests": 1000}, "resets_at": time.time() + 5 * 3600,
+        "note": "นับจาก Hermes เท่านั้น (เครื่องมืออื่นไม่นับ)"}}),
+    "nemotron": ("up", "API ใช้ได้", 640, {"model": "nvidia/nemotron-3-nano", "daily": {
+        "requests": 37, "tokens": 58_400, "limits": {}, "resets_at": time.time() + 5 * 3600,
+        "note": "นับจาก Hermes เท่านั้น (เครื่องมืออื่นไม่นับ)"}}),
     "sparkx": ("up", "พร้อมใช้ · จะโหลดเข้า VRAM เมื่อมีการเรียกใช้", 18, {
         "state": "ready", "loaded": False, "model": "sparkx-2.5:8b", "params": "8.2B", "quant": "Q5_K_M",
         "disk_gb": 5.6, "ollama_version": "0.12.1", "server": "127.0.0.1:11434",

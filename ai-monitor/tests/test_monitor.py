@@ -592,3 +592,30 @@ def test_credit_rates_match_exact_model_only():
     assert _rate(rates, "xiaomi/MiMo-V2.6-Pro:latest") == [2.5, 300, 600]
     assert _rate(rates, "mimo-v2.6-pro-ultraspeed") is None
     assert _rate(rates, "mimo-v2.6") is None
+
+
+def test_free_tier_daily_usage_and_429_count(tmp_path):
+    from datetime import datetime
+    from ai_monitor.checkers import credits
+    home = tmp_path / "hermes"
+    home.mkdir()
+    db = sqlite3.connect(home / "state.db")
+    db.execute("CREATE TABLE session_model_usage (model TEXT, billing_provider TEXT, api_call_count INT, input_tokens INT,"
+               " cache_read_tokens INT, cache_write_tokens INT, output_tokens INT, last_seen REAL)")
+    now = datetime(2026, 9, 24, 15, 0).timestamp()  # local time
+    today, yesterday = datetime(2026, 9, 24, 9, 0).timestamp(), datetime(2026, 9, 23, 22, 0).timestamp()
+    db.executemany("INSERT INTO session_model_usage VALUES (?,?,?,?,?,?,?,?)", [
+        ("glm-4.5-flash", "zai", 10, 100, 50, 0, 20, today),
+        ("glm-4.5-flash", "zai", 99, 9999, 0, 0, 0, yesterday),
+        ("qwen3.5:9b", "custom", 5, 5, 0, 0, 5, today)])
+    db.commit()
+    db.close()
+    d = credits.daily_usage({"match": "glm", "requests": 1000}, home, now)
+    assert (d["requests"], d["tokens"], d["limits"]) == (10, 170, {"requests": 1000.0})
+    assert d["resets_at"] == datetime(2026, 9, 25).timestamp()
+    assert credits.daily_usage({}, home, now)["error"]
+
+    store = Store(":memory:")
+    store.add_check("glm", "degraded", 1, "โดน rate limit (HTTP 429: busy)", {})
+    store.add_check("glm", "up", 1, "API ใช้ได้", {})
+    assert store.count_detail("glm", 0, "%HTTP 429%") == 1

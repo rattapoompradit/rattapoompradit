@@ -142,6 +142,24 @@ function localInner(p) {
 
 /* ---------- cards ---------- */
 
+function compact(n) {
+  return n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${Math.round(n)}`;
+}
+
+// Free tier: today's use by Hermes, as bars when a daily limit is configured, else as plain numbers.
+function dailyBlock(d) {
+  if (d.error) return `<div class="usage-error" title="${esc(d.error)}">⚠ ${esc(d.error)}</div>`;
+  const reset = resetText(d.resets_at);
+  const rows = [["requests", "Requests วันนี้", d.requests], ["tokens", "Tokens วันนี้", d.tokens]].map(([k, label, used]) => {
+    const limit = d.limits && d.limits[k];
+    if (!limit) return "";
+    const pct = Math.round((used * 1000) / limit) / 10;
+    return bar(`${label} · ${compact(used)} / ${compact(limit)}`, pct, `<b>${pct}%</b>${reset}`, level(pct, 70, 90));
+  }).join("");
+  const plain = rows ? "" : `<div class="stats">${stat("REQ วันนี้", compact(d.requests))}${stat("TOK วันนี้", compact(d.tokens))}</div>`;
+  return `<div class="bars">${rows}${plain}<div class="usage-note" title="${esc(d.note)}">${esc(d.note)}${rows ? "" : " · ยังไม่ได้ตั้งเพดาน"}</div></div>`;
+}
+
 function providerInner(p) {
   const x = p.extra || {};
   const stats = [];
@@ -149,13 +167,14 @@ function providerInner(p) {
   if (x.quota_pct != null) stats.push(stat("QUOTA", `${x.quota_pct}%`));
   if (x.vram_gb != null) stats.push(stat("VRAM", x.vram_gb, "GB"));
   if (p.uptime_24h != null) stats.push(stat("UP 24H", `${p.uptime_24h}%`));
+  if (p.rate_limited_24h) stats.push(stat("429 24H", p.rate_limited_24h, "ครั้ง"));
   const sub = x.incident ? `<div class="sub warn" title="${esc(x.incident)}">⚠ ${esc(x.incident)}</div>`
     : x.model ? `<div class="sub" title="${esc(x.model)}">${esc(x.model)}</div>`
     : x.usage && x.usage.plan ? `<div class="sub">แพ็กเกจ ${esc(String(x.usage.plan).toUpperCase())}</div>` : "";
   return `${head(p)}${stateLine(p)}
     <div class="detail" title="${esc(p.detail)}">${esc(p.detail)}</div>${sub}
     <div class="stats">${stats.join("")}</div>
-    ${x.usage ? usageBars(x.usage) : sparkline(p.history || [])}`;
+    ${x.usage ? usageBars(x.usage) : x.daily ? dailyBlock(x.daily) : sparkline(p.history || [])}`;
 }
 
 function gpuInner(p, providers) {
@@ -265,6 +284,8 @@ function openModal(id) {
     p.extra && p.extra.incident ? ["เหตุการณ์", p.extra.incident] : null,
     ["เช็คล่าสุด", p.checked_at ? `${clockSec(p.checked_at)} · ทุก ${p.interval_s} วินาที` : "-"],
     p.uptime_24h != null ? ["Uptime 24 ชม.", `${p.uptime_24h}% (เช็คสำเร็จ ไม่ใช่โควตา)`] : null,
+    p.rate_limited_24h != null ? ["429 ใน 24 ชม.", `${p.rate_limited_24h} ครั้ง (จากการเช็คของ AI Monitor)`] : null,
+    p.extra && p.extra.daily && !p.extra.daily.error ? ["ใช้วันนี้ (Hermes)", `${num(p.extra.daily.requests)} requests · ${num(p.extra.daily.tokens)} tokens`] : null,
     p.extra && p.extra.usage && p.extra.usage.console_url ? ["โควตาจริง", p.extra.usage.console_url] : null,
     hist.length ? ["ประวัติ", `ต่ำสุด ${Math.min(...hist)} · สูงสุด ${Math.max(...hist)} ${unit}`] : null,
   ].filter(Boolean);

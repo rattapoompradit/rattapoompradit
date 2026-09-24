@@ -49,6 +49,7 @@ def create_app(cfg: Config, store: Store | None = None, start: bool = True,
                 "id": p.id, "name": p.name, "group": p.group, "type": p.type, "interval_s": p.interval_s, **state,
                 "history": store.latencies(p.id, extra_key="temp" if p.type == "gpu" else None),
                 "uptime_24h": store.uptime_pct(p.id, day_ago),
+                "rate_limited_24h": store.count_detail(p.id, day_ago, "%HTTP 429%") if p.type == "openai_compat" else None,
             })
         names = {p.id: p.name for p in cfg.providers}
         events = [{**e, "name": names.get(e["provider"], e["provider"])} for e in store.recent_events()]

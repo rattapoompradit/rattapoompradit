@@ -83,6 +83,11 @@ providers:
     base_url: https://api.z.ai/api/paas/v4
     api_key_env: ZAI_API_KEY
     model_hint: flash
+    daily:                    # ใช้วันนี้ (นับจาก Hermes) — ใส่เพดานจริงของบัญชีถ้ารู้ ไม่ใส่ = แสดงตัวเลขอย่างเดียว
+      match: glm
+      reset: local            # local = เที่ยงคืนเวลาไทย, utc = 07:00 เวลาไทย
+      # requests: 1000
+      # tokens: 1000000
 
   - id: nemotron
     name: Nemotron 3
@@ -91,6 +96,11 @@ providers:
     base_url: https://integrate.api.nvidia.com/v1
     api_key_env: NVIDIA_API_KEY
     model_hint: nemotron
+    daily:
+      match: nemotron
+      reset: local
+      # requests: 1000
+      # tokens: 1000000
     # probe: true             # เปิดถ้าอยากยิง prompt จริง 1 token เพื่อวัด latency
     # probe_interval_s: 1800
 

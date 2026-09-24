@@ -87,6 +87,9 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     if plan := p.options.get("credits"):  # plans with no quota API: estimated from Hermes' usage records
         home = hermes.resolve_home({"home": p.options.get("_hermes_home", "auto")})
         result.extra["usage"] = await asyncio.to_thread(credits.estimate, plan, home, time.time())
+    if daily := p.options.get("daily"):  # free tiers: today's requests / tokens from Hermes vs. optional limits
+        home = hermes.resolve_home({"home": p.options.get("_hermes_home", "auto")})
+        result.extra["daily"] = await asyncio.to_thread(credits.daily_usage, daily, home, time.time())
     return result
 
 

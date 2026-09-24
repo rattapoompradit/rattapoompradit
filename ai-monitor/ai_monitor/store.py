@@ -71,6 +71,14 @@ class Store:
             ).fetchone()
         return round(up * 100 / total, 1) if total else None
 
+    def count_detail(self, provider: str, since: float, pattern: str) -> int:
+        """How many checks since `since` had a detail matching the SQL LIKE `pattern` (e.g. '%HTTP 429%')."""
+        with self._lock:
+            (n,) = self._conn.execute(
+                "SELECT COUNT(*) FROM checks WHERE provider = ? AND ts >= ? AND detail LIKE ?", (provider, since, pattern)
+            ).fetchone()
+        return n
+
     def recent_events(self, limit: int = 8) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(

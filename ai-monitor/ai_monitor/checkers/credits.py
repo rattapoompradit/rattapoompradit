@@ -124,3 +124,42 @@ def estimate(cfg: dict, hermes_home: Path, now: float) -> dict:
         "cycle_start": start,
     }
 
+
+
+def _day_window(now: float, reset: str) -> tuple[float, float]:
+    """(start, end) of the current day; `reset` is "local" (midnight here) or "utc" (00:00 UTC)."""
+    tz = timezone.utc if str(reset).lower() == "utc" else None
+    today = datetime.fromtimestamp(now, tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = today.timestamp()
+    return start, start + DAY
+
+
+def daily_usage(cfg: dict, hermes_home: Path, now: float) -> dict:
+    """Requests / tokens Hermes used today on models matching cfg["match"], with optional daily limits.
+
+    Hermes aggregates usage per session, so a session that spans the reset time counts in full today."""
+    match = str(cfg.get("match") or "").lower()
+    if not match:
+        return {"error": "ตั้ง daily.match (ชื่อโมเดลหรือ provider) ใน config.yaml"}
+    start, end = _day_window(now, cfg.get("reset", "local"))
+    requests = tokens = 0
+    for db in (hermes_home / "state.db", *sorted((hermes_home / "profiles").glob("*/state.db"))):
+        if not db.is_file():
+            continue
+        try:
+            conn = sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True, timeout=2)
+            try:
+                row = conn.execute(
+                    "SELECT COALESCE(SUM(api_call_count), 0), COALESCE(SUM(input_tokens + cache_read_tokens"
+                    " + cache_write_tokens + output_tokens), 0) FROM session_model_usage"
+                    " WHERE (lower(model) LIKE ? OR lower(billing_provider) LIKE ?) AND COALESCE(last_seen, 0) >= ?",
+                    (f"%{match}%", f"%{match}%", start)).fetchone()
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            continue
+        requests += int(row[0] or 0)
+        tokens += int(row[1] or 0)
+    limits = {k: float(cfg[k]) for k in ("requests", "tokens") if cfg.get(k)}
+    return {"requests": requests, "tokens": tokens, "limits": limits, "resets_at": end,
+            "note": "นับจาก Hermes เท่านั้น (เครื่องมืออื่นไม่นับ)"}
