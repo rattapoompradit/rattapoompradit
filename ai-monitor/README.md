@@ -53,6 +53,16 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 - `key_from: env` ใช้เฉพาะ `.env` ของ AI Monitor
 - การ์ดจะบอกท้ายข้อความว่า "key จาก Hermes" เมื่อใช้ key ของ Hermes
 
+### Credits ของ MiMo (Token Plan)
+
+MiMo ไม่มี API บอกโควตา แถบ **Credits (ประมาณ)** จึงคำนวณจาก token ที่ Hermes บันทึกไว้ (`state.db` ตาราง `session_model_usage` ทั้งของ Hermes หลักและ `profiles\\*`) ในรอบบิลปัจจุบัน:
+
+- credits = cache hit × อัตรา 1 + cache miss × อัตรา 2 + output × อัตรา 3 (ตั้งใน `credits.rates`) และลด 20% ช่วง 16:00–24:00 UTC
+- รอบบิล 30 วัน นับจาก `credits.renews_at` (วัน "Valid until" ในหน้า Plan usage) ต่ออายุอัตโนมัติ
+- นับเฉพาะที่ Hermes ใช้ ถ้าใช้แพ็กเดียวกันกับเครื่องมืออื่น ตัวเลขจริงจะสูงกว่า ดูค่าจริงได้ที่หน้า console ของ MiMo
+- โมเดลที่ยังไม่มีอัตราใน `credits.rates` จะไม่ถูกนับ และการ์ดจะบอกชื่อไว้
+- `UP 24H` บนทุกการ์ด = % การเช็คที่สำเร็จใน 24 ชม. (availability) ไม่ใช่โควตา
+
 ### แถบโควตา ChatGPT / Claude
 
 ใช้การล็อกอิน subscription ที่มีอยู่แล้วในเครื่อง (อ่านอย่างเดียว ไม่ต่ออายุ token เอง และส่ง token ไปที่ผู้ให้บริการเจ้าของเท่านั้น)

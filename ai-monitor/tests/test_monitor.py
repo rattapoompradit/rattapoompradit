@@ -534,3 +534,36 @@ def test_hermes_home_ignores_profile_override(tmp_path, monkeypatch):
     assert default_home() == tmp_path / "hermes"
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "custom"))
     assert default_home() == tmp_path / "custom"
+
+
+def test_mimo_credit_estimate(tmp_path):
+    from datetime import datetime, timezone
+    from ai_monitor.checkers import credits
+    home = tmp_path / "hermes"
+    (home / "profiles" / "mimo").mkdir(parents=True)
+    db = sqlite3.connect(home / "profiles" / "mimo" / "state.db")
+    db.execute("CREATE TABLE session_model_usage (session_id TEXT, model TEXT, billing_provider TEXT, input_tokens INT,"
+               " output_tokens INT, cache_read_tokens INT, cache_write_tokens INT, last_seen REAL)")
+    peak = datetime(2026, 9, 24, 3, 0, tzinfo=timezone.utc).timestamp()      # 10:00 Thai time
+    offpeak = datetime(2026, 9, 24, 18, 0, tzinfo=timezone.utc).timestamp()  # 01:00 Thai time
+    old = datetime(2026, 8, 1, tzinfo=timezone.utc).timestamp()              # previous cycle
+    db.executemany("INSERT INTO session_model_usage VALUES (?,?,?,?,?,?,?,?)", [
+        ("a", "mimo-v2.5-pro", "xiaomi", 1000, 100, 10000, 0, peak),     # 1000*300 + 100*600 + 10000*2.5 = 385000
+        ("b", "mimo-v2.5", "xiaomi", 1000, 100, 0, 0, offpeak),          # (100000 + 20000) * 0.8 = 96000
+        ("c", "mimo-v2.6-pro", "xiaomi", 50, 5, 0, 0, peak),             # no rate configured
+        ("d", "mimo-v2.5-pro", "xiaomi", 10**9, 0, 0, 0, old),           # before this cycle
+        ("e", "qwen3.5:9b", "custom", 999, 999, 0, 0, peak),             # not MiMo
+    ])
+    db.commit()
+    db.close()
+
+    cfg = {"plan": "Lite", "monthly": 4_100_000_000, "renews_at": "2026-08-23T23:59:59Z", "cycle_days": 30,
+           "rates": {"mimo-v2.5-pro": [2.5, 300, 600], "mimo-v2.5": [2, 100, 200]}}
+    now = datetime(2026, 9, 25, tzinfo=timezone.utc).timestamp()
+    out = credits.estimate(cfg, home, now)
+    bar = out["bars"][0]
+    assert bar["used"] == 385000 + 96000
+    assert bar["resets_at"] == datetime(2026, 10, 22, 23, 59, 59, tzinfo=timezone.utc).timestamp()  # rolled forward
+    assert bar["tokens"] == 11100 + 1100 + 55
+    assert "mimo-v2.6-pro" in out["note"] and out["estimated"] is True
+    assert credits.estimate({"monthly": 0}, home, now)["error"]

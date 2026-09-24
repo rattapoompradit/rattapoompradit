@@ -39,6 +39,7 @@ function resetText(ts) {
   if (!ts) return "";
   const d = new Date(ts * 1000);
   const sameDay = d.toDateString() === new Date().toDateString();
+  if (ts - Date.now() / 1000 > 7 * 86400) return "รีเซ็ต " + d.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
   return "รีเซ็ต " + (sameDay ? clock(ts) : d.toLocaleDateString("th-TH", { weekday: "short", hour: "2-digit", minute: "2-digit" }));
 }
 
@@ -66,8 +67,11 @@ function bar(label, pct, right, lv) {
 
 function usageBars(u) {
   if (u.error) return `<div class="usage-error" title="${esc(u.error)}">⚠ โควตา: ${esc(u.error)}</div>`;
-  return `<div class="bars">${(u.bars || []).map((b) =>
-    bar(esc(b.label), b.used_pct, `<b>${b.used_pct}%</b>${resetText(b.resets_at)}`, level(b.used_pct, 70, 90))).join("")}</div>`;
+  const big = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${Math.round(n)}`);
+  return `<div class="bars">${(u.bars || []).map((b) => {
+    const label = b.used != null && b.total ? `${esc(b.label)} · ${big(b.used)} / ${big(b.total)}` : esc(b.label);
+    return bar(label, b.used_pct, `<b>${b.used_pct}%</b>${resetText(b.resets_at)}`, level(b.used_pct, 70, 90));
+  }).join("")}${u.note ? `<div class="usage-note" title="${esc(u.note)}">${esc(u.note)}</div>` : ""}</div>`;
 }
 
 function gauge(label, value, unit, pct, lv, sub = "") {
@@ -119,7 +123,7 @@ function localInner(p) {
       <div class="stats">${x.context ? stat("CTX", num(x.context)) : ""}${api}</div>
       ${x.expires_at ? `<div class="unload" data-exp="${x.expires_at}">${unloadText(x.expires_at)}</div>` : ""}`;
   } else if (x.state === "ready" && p.status !== "down") {
-    body = `${speedBlock(x.speed)}<div class="stats">${x.disk_gb ? stat("SIZE", x.disk_gb, "GB") : ""}${api}${p.uptime_24h != null ? stat("24H", `${p.uptime_24h}%`) : ""}</div>
+    body = `${speedBlock(x.speed)}<div class="stats">${x.disk_gb ? stat("SIZE", x.disk_gb, "GB") : ""}${api}${p.uptime_24h != null ? stat("UP 24H", `${p.uptime_24h}%`) : ""}</div>
       <div class="idle-note">◇ ไม่ได้ใช้ VRAM ตอนนี้ · โหลดเองเมื่อมีการเรียกใช้</div>`;
   } else if (x.state === "missing" && p.status !== "down") {
     body = `<div class="idle-note">โมเดลที่มีใน Ollama (แก้ model_hint ใน config.yaml):</div>
@@ -144,7 +148,7 @@ function providerInner(p) {
   if (p.latency_ms != null) stats.push(stat("LAT", num(p.latency_ms), "ms"));
   if (x.quota_pct != null) stats.push(stat("QUOTA", `${x.quota_pct}%`));
   if (x.vram_gb != null) stats.push(stat("VRAM", x.vram_gb, "GB"));
-  if (p.uptime_24h != null) stats.push(stat("24H", `${p.uptime_24h}%`));
+  if (p.uptime_24h != null) stats.push(stat("UP 24H", `${p.uptime_24h}%`));
   const sub = x.incident ? `<div class="sub warn" title="${esc(x.incident)}">⚠ ${esc(x.incident)}</div>`
     : x.model ? `<div class="sub" title="${esc(x.model)}">${esc(x.model)}</div>`
     : x.usage && x.usage.plan ? `<div class="sub">แพ็กเกจ ${esc(String(x.usage.plan).toUpperCase())}</div>` : "";
@@ -260,7 +264,8 @@ function openModal(id) {
     ["รายละเอียด", p.detail],
     p.extra && p.extra.incident ? ["เหตุการณ์", p.extra.incident] : null,
     ["เช็คล่าสุด", p.checked_at ? `${clockSec(p.checked_at)} · ทุก ${p.interval_s} วินาที` : "-"],
-    p.uptime_24h != null ? ["Uptime 24 ชม.", `${p.uptime_24h}%`] : null,
+    p.uptime_24h != null ? ["Uptime 24 ชม.", `${p.uptime_24h}% (เช็คสำเร็จ ไม่ใช่โควตา)`] : null,
+    p.extra && p.extra.usage && p.extra.usage.console_url ? ["โควตาจริง", p.extra.usage.console_url] : null,
     hist.length ? ["ประวัติ", `ต่ำสุด ${Math.min(...hist)} · สูงสุด ${Math.max(...hist)} ${unit}`] : null,
   ].filter(Boolean);
   const modal = document.getElementById("modal");

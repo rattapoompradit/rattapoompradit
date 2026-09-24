@@ -58,6 +58,20 @@ providers:
     interval_s: 300           # แพ็กเกจนี้สำหรับใช้งานแบบโต้ตอบ: เช็คแค่รายชื่อโมเดลทุก 5 นาที ไม่ส่ง prompt
     # auth_header: api-key    # ถ้า MiMo ต้องส่ง key ใน header "api-key" แทน "Authorization: Bearer"
     model_hint: mimo
+    # MiMo ไม่มี API โควตา: แถบนี้เป็น "ประมาณการ" จาก token ที่ Hermes บันทึกไว้ (state.db) x อัตรา credit
+    credits:
+      plan: Lite
+      monthly: 4100000000                 # 4.1B Credits / เดือน
+      renews_at: "2026-10-22T23:59:59Z"   # "Valid until" ในหน้า Plan usage (ต่ออายุอัตโนมัติทุก 30 วัน)
+      cycle_days: 30
+      match: mimo
+      rates:                              # credits ต่อ token: [input cache hit, input cache miss, output]
+        mimo-v2.5-pro: [2.5, 300, 600]
+        mimo-v2.5: [2, 100, 200]
+        # mimo-v2.6-pro: [?, ?, ?]        # ใส่ตามหน้า mimo.mi.com/docs/en-US/price/token-plan
+      offpeak_utc: [16, 24]               # 23:00-07:00 เวลาไทย ลด 20%
+      offpeak_factor: 0.8
+      console_url: https://platform.xiaomimimo.com/#/console/plan-manage
 
   - id: glm
     name: Z.ai GLM Flash

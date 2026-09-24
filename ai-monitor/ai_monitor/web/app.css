@@ -158,6 +158,8 @@ body > * { position: relative; z-index: 1; }
 /* Subscription usage: segmented neon bars */
 .bars { margin-top: auto; display: flex; flex-direction: column; gap: 1.1vh; }
 .bar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1vh; font-size: 1.8vh; color: var(--muted); white-space: nowrap; }
+.bar-head span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bar-head span:last-child { flex: none; }
 .bar-head b { font-family: var(--head); font-size: 2.1vh; color: var(--lv); text-shadow: 0 0 1vh var(--lv); margin-right: 0.6vh; }
 .track { position: relative; height: 1.6vh; margin-top: 0.5vh; border-radius: 0.4vh; overflow: hidden;
   background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 0.9vh, transparent 0.9vh 1.2vh); }
@@ -165,6 +167,8 @@ body > * { position: relative; z-index: 1; }
   background: repeating-linear-gradient(90deg, var(--lv) 0 0.9vh, transparent 0.9vh 1.2vh);
   filter: drop-shadow(0 0 0.6vh var(--lv)); }
 .lv-up { --lv: var(--up); } .lv-degraded { --lv: var(--degraded); } .lv-down { --lv: var(--down); }
+.usage-note { font-size: 1.5vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -0.4vh; }
+.modal-card .usage-note { white-space: normal; }
 .usage-error { margin-top: auto; color: var(--degraded); font-size: 1.8vh; }
 
 /* ---------- Hermes Router status bar ---------- */

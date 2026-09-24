@@ -1,5 +1,6 @@
 """OpenAI-compatible APIs: GET /models (free), optional 1-token chat probe."""
 
+import asyncio
 import os
 import time
 
@@ -7,7 +8,7 @@ import httpx
 
 from ..config import Provider, read_env_file
 from ..models import CheckResult
-from . import hermes
+from . import credits, hermes
 
 # AI Monitor env name -> (Hermes' key variable, Hermes' base-URL variable), from Hermes' provider table
 HERMES_VARS = {
@@ -80,6 +81,14 @@ def resolve_key(p: Provider) -> tuple[str, str, str]:
 
 
 async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
+    result = await _check(p, client)
+    if plan := p.options.get("credits"):  # plans with no quota API: estimated from Hermes' usage records
+        home = hermes.resolve_home({"home": p.options.get("_hermes_home", "auto")})
+        result.extra["usage"] = await asyncio.to_thread(credits.estimate, plan, home, time.time())
+    return result
+
+
+async def _check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     env = p.options.get("api_key_env")
     key, base, source = resolve_key(p)
     if env and not key:

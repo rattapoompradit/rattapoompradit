@@ -23,7 +23,11 @@ SAMPLES = {
             {"label": "5 ชม.", "used_pct": 78, "resets_at": time.time() + 5400},
             {"label": "สัปดาห์", "used_pct": 44, "resets_at": time.time() + 4 * 86400},
             {"label": "Opus/สัปดาห์", "used_pct": 93, "resets_at": time.time() + 4 * 86400}]}}),
-    "mimo": ("unknown", "ยังไม่ได้ใส่ MIMO_API_KEY ใน .env", None, {}),
+    "mimo": ("up", "API ใช้ได้ · key จาก Hermes", 378, {"model": "mimo-v2.6-pro", "usage": {
+        "plan": "Lite", "estimated": True, "note": "ประมาณการจาก token ที่ Hermes ใช้ (เครื่องมืออื่นไม่นับ)",
+        "console_url": "https://platform.xiaomimimo.com/#/console/plan-manage",
+        "bars": [{"label": "Credits (ประมาณ)", "used_pct": 18.4, "used": 754_000_000,
+                  "total": 4_100_000_000, "resets_at": time.time() + 28 * 86400}]}}),
     "glm": ("degraded", "โดน rate limit (HTTP 429)", 950, {"model": "glm-4.5-flash", "quota_pct": 6}),
     "nemotron": ("up", "API ใช้ได้", 640, {"model": "nvidia/nemotron-3-nano", "quota_pct": 72}),
     "sparkx": ("up", "พร้อมใช้ · จะโหลดเข้า VRAM เมื่อมีการเรียกใช้", 18, {
