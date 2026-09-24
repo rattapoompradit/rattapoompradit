@@ -38,7 +38,7 @@ def load_env(path: Path) -> None:
     """Minimal KEY=VALUE loader; real environment variables win."""
     if not path.is_file():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8-sig").splitlines():  # Notepad may add a BOM
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
