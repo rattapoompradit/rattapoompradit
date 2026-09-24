@@ -1,0 +1,53 @@
+import asyncio
+import contextlib
+import time
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from .config import Config
+from .engine import Monitor
+from .store import Store
+
+WEB = Path(__file__).parent / "web"
+
+
+def create_app(cfg: Config, store: Store | None = None, start: bool = True) -> FastAPI:
+    store = store or Store(cfg.db_path)
+    monitor = Monitor(cfg, store)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_: FastAPI):
+        task = asyncio.create_task(monitor.run()) if start else None
+        yield
+        if task:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    app = FastAPI(title="AI Monitor", lifespan=lifespan)
+    app.state.monitor = monitor
+
+    @app.get("/api/status")
+    def status() -> dict:
+        day_ago = time.time() - 86400
+        providers = []
+        for p in cfg.providers:
+            state = monitor.state.get(p.id) or {"status": "unknown", "detail": "กำลังเช็ค…", "extra": {}}
+            providers.append({
+                "id": p.id, "name": p.name, "group": p.group, "type": p.type, **state,
+                "history": store.latencies(p.id),
+                "uptime_24h": store.uptime_pct(p.id, day_ago),
+            })
+        names = {p.id: p.name for p in cfg.providers}
+        events = [{**e, "name": names.get(e["provider"], e["provider"])} for e in store.recent_events()]
+        return {"generated_at": time.time(), "providers": providers, "events": events}
+
+    @app.get("/")
+    def index() -> FileResponse:
+        return FileResponse(WEB / "index.html")
+
+    app.mount("/static", StaticFiles(directory=WEB), name="static")
+    return app

@@ -1,5 +1,13 @@
 # AI Monitor — Design
 
+> **สถานะ:** Phase 1 ทำแล้วใน [`ai-monitor/`](ai-monitor/README.md) โดยปรับจากแบบเดิมตามคำตอบของผู้ใช้:
+> - รันบน **Windows native**; Hermes home = `%LOCALAPPDATA%\hermes` (ตรวจจากซอร์สของ hermes-agent แล้ว)
+> - Sparkx / Qwen รันผ่าน **Ollama**
+> - ChatGPT / Claude ใช้ **subscription** → เช็คจาก status page อย่างเดียว
+> - ไม่รู้ชื่อโมเดลแน่ชัด → ใช้ `model_hint` ให้ระบบหาชื่อจริงจาก `/models`
+> - แจ้งเตือน **บนจอ Xeneon Edge** (การ์ดแดงกะพริบ + event log) แทน Telegram
+> - ตัด APScheduler / Jinja / HTMX ออก ใช้ asyncio + HTML/JS ล้วน (dependency น้อยลง)
+
 Dashboard เดียวสำหรับดูสถานะของ AI ทุกตัวที่ใช้งาน (Cloud API, Free tier, Local) พร้อม Status Card เฉพาะของ Hermes Agent
 
 ## 1. เป้าหมาย

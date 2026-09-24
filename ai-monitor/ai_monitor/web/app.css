@@ -1,0 +1,124 @@
+/* Designed for Corsair Xeneon Edge (2560x720, 32:9); sizes scale with viewport height. */
+:root {
+  --bg: #07090d;
+  --card: #10141c;
+  --card-2: #161b25;
+  --line: #232a37;
+  --text: #e8ecf3;
+  --muted: #8a93a6;
+  --up: #2ecc71;
+  --degraded: #f5b82e;
+  --down: #ff4d5e;
+  --unknown: #6b7385;
+  --gap: 1.2vh;
+  --radius: 1.6vh;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", "Leelawadee UI", "Noto Sans Thai", system-ui, sans-serif;
+  font-size: 2.4vh;
+  overflow: hidden;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 3fr);
+  gap: var(--gap);
+  height: 100vh;
+  padding: var(--gap);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 0.7vh solid var(--c, var(--unknown));
+  border-radius: var(--radius);
+  padding: 1.6vh 1.8vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.status-up { --c: var(--up); }
+.status-degraded { --c: var(--degraded); }
+.status-down { --c: var(--down); animation: alarm 1.6s ease-in-out infinite; }
+.status-unknown { --c: var(--unknown); }
+
+@keyframes alarm {
+  50% { box-shadow: 0 0 2.4vh color-mix(in srgb, var(--down) 55%, transparent); border-color: var(--down); }
+}
+
+.head { display: flex; align-items: center; gap: 1vh; min-width: 0; }
+.name { font-weight: 650; font-size: 3.4vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group {
+  margin-left: auto;
+  font-size: 1.8vh;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 0.2vh 1vh;
+  white-space: nowrap;
+}
+.dot { width: 1.6vh; height: 1.6vh; border-radius: 50%; background: var(--c); flex: none; box-shadow: 0 0 1.2vh var(--c); }
+
+.state { font-size: 5vh; font-weight: 700; color: var(--c); line-height: 1.1; }
+.state small { font-size: 2.2vh; color: var(--muted); font-weight: 500; margin-left: 0.8vh; }
+.detail { color: var(--muted); font-size: 2.3vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { display: flex; gap: 1.6vh; font-size: 2.2vh; color: var(--muted); flex-wrap: wrap; }
+.meta b { color: var(--text); font-weight: 600; }
+
+.spark { margin-top: auto; width: 100%; height: 9vh; flex: none; }
+.spark polyline { fill: none; stroke: var(--c); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.spark .area { fill: color-mix(in srgb, var(--c) 14%, transparent); stroke: none; }
+
+/* Hermes status card */
+.hermes { gap: 1vh; }
+.hermes .name { font-size: 4vh; }
+.hermes .rows { display: grid; grid-template-columns: auto 1fr; gap: 1vh 1.8vh; font-size: 2.6vh; }
+.hermes .rows dt { color: var(--muted); }
+.hermes .rows dd { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chips { display: flex; gap: 0.6vh; flex-wrap: wrap; }
+.chip { font-size: 2vh; padding: 0.2vh 1vh; border-radius: 99px; background: var(--card-2); border: 1px solid var(--line); }
+.chip.ok { color: var(--up); }
+.chip.bad { color: var(--degraded); }
+.errors { margin-top: auto; background: var(--card-2); border-radius: 1vh; padding: 0.8vh 1.2vh; font: 1.8vh/1.45 Consolas, "Cascadia Mono", monospace; color: #ffb3ba; min-height: 0; overflow: hidden; }
+.errors.none { color: var(--muted); font-family: inherit; }
+.errors div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Event log card */
+.events { --c: #3b82f6; }
+.clock { font-size: 4.6vh; font-weight: 700; font-variant-numeric: tabular-nums; }
+.events ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.8vh; font-size: 2vh; min-height: 0; overflow: hidden; }
+.events li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.events li b { color: var(--text); font-weight: 600; }
+.to-up { color: var(--up); } .to-degraded { color: var(--degraded); } .to-down { color: var(--down); } .to-unknown { color: var(--unknown); }
+.stale { color: var(--down); font-size: 1.6vh; }
+
+/* Fallback for normal / narrow screens */
+@media (max-aspect-ratio: 2/1) {
+  html, body { font-size: 15px; overflow: auto; }
+  .layout { grid-template-columns: 1fr; height: auto; padding: 16px; gap: 12px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); grid-template-rows: none; gap: 12px; }
+  .card { padding: 14px 16px; border-left-width: 6px; border-radius: 12px; gap: 6px; }
+  .name, .hermes .name { font-size: 20px; } .state { font-size: 26px; } .state small { font-size: 14px; }
+  .detail, .meta, .hermes .rows, .events ul, .group, .chip, .errors, .stale { font-size: 13px; }
+  .dot { width: 12px; height: 12px; } .spark { height: 40px; } .clock { font-size: 24px; }
+}

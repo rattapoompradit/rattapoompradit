@@ -1,0 +1,75 @@
+# AI Monitor config — แก้ได้เลย ไม่มีความลับในไฟล์นี้ (API key อยู่ใน .env)
+host: 127.0.0.1
+port: 8765
+db_path: ai-monitor.db
+retention_days: 30
+
+defaults:
+  interval_s: 60            # เช็คทุกกี่วินาที
+  timeout_s: 15
+  degraded_latency_ms: 5000 # ช้ากว่านี้ = สีเหลือง
+  fail_threshold: 2         # ล้มกี่ครั้งติดกันถึงขึ้นสีแดง
+
+providers:
+  - id: hermes
+    name: Hermes Agent
+    type: hermes
+    interval_s: 15
+    home: auto              # auto = %LOCALAPPDATA%\hermes (Windows) หรือ ~/.hermes
+    gateway_required: true  # ถ้าใช้แต่ CLI ไม่ได้เปิด gateway ให้ตั้งเป็น false
+
+  # ChatGPT / Claude ใช้แบบ subscription จึงเช็คจาก status page ทางการ (ไม่ใช้ key ไม่เสีย token)
+  - id: chatgpt
+    name: ChatGPT
+    group: Cloud
+    type: status_page
+    url: https://status.openai.com/api/v2/summary.json
+    component: ChatGPT
+
+  - id: claude
+    name: Claude
+    group: Cloud
+    type: status_page
+    url: https://status.anthropic.com/api/v2/summary.json
+    component: claude.ai
+
+  # model_hint = คำที่อยู่ในชื่อโมเดล ระบบจะหาชื่อจริงจาก /models ให้เอง
+  - id: mimo
+    name: MiMo
+    group: Cloud
+    type: openai_compat
+    base_url: https://api.xiaomimimo.com/v1
+    api_key_env: MIMO_API_KEY
+    model_hint: mimo
+
+  - id: glm
+    name: Z.ai GLM Flash
+    group: Free
+    type: openai_compat
+    base_url: https://api.z.ai/api/paas/v4
+    api_key_env: ZAI_API_KEY
+    model_hint: flash
+
+  - id: nemotron
+    name: Nemotron 3
+    group: Free
+    type: openai_compat
+    base_url: https://integrate.api.nvidia.com/v1
+    api_key_env: NVIDIA_API_KEY
+    model_hint: nemotron
+    # probe: true             # เปิดถ้าอยากยิง prompt จริง 1 token เพื่อวัด latency
+    # probe_interval_s: 1800
+
+  - id: sparkx
+    name: Sparkx 2.5
+    group: Local
+    type: ollama
+    base_url: http://localhost:11434
+    model_hint: spark         # แก้ให้ตรงกับชื่อใน `ollama list`
+
+  - id: qwen
+    name: Qwen 3.5
+    group: Local
+    type: ollama
+    base_url: http://localhost:11434
+    model_hint: qwen3.5
