@@ -3,10 +3,12 @@ import contextlib
 import time
 from pathlib import Path
 
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .checkers import ollama
 from .config import Config
 from .engine import Monitor
 from .store import Store
@@ -44,6 +46,19 @@ def create_app(cfg: Config, store: Store | None = None, start: bool = True) -> F
         names = {p.id: p.name for p in cfg.providers}
         events = [{**e, "name": names.get(e["provider"], e["provider"])} for e in store.recent_events()]
         return {"generated_at": time.time(), "providers": providers, "events": events}
+
+    @app.post("/api/bench/{provider_id}")
+    async def bench(provider_id: str) -> dict:
+        p = next((p for p in cfg.providers if p.id == provider_id and p.type == "ollama"), None)
+        if p is None:
+            raise HTTPException(404, "not a local model")
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                result = await ollama.benchmark(p, client)
+            except (httpx.HTTPError, ValueError) as exc:
+                return {"error": str(exc) or type(exc).__name__}
+            await monitor.check_once(p, client)  # refresh the card right away
+        return result
 
     @app.get("/")
     def index() -> FileResponse:

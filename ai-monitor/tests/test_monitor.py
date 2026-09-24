@@ -110,11 +110,15 @@ def test_ollama_states():
                    "expires_at": expires, "context_length": 8192})
     r = run(ol.check, p, handler)
     x = r.extra
-    assert (x["state"], x["gpu_pct"], x["vram_gb"], x["tok_s"], x["context"]) == ("active", 80, 8.0, 40.0, 8192)
+    assert (x["state"], x["gpu_pct"], x["vram_gb"], x["speed"]["tok_s"], x["context"]) == ("active", 80, 8.0, 40.0, 8192)
     assert "CPU 20%" in r.detail
     assert generated[0]["options"]["num_predict"] == 16 and generated[0]["keep_alive"].endswith("s")
     run(ol.check, p, handler)
     assert len(generated) == 1  # probe interval respected
+
+    loaded.clear()
+    r = run(ol.check, p, handler)
+    assert (r.extra["state"], r.extra["speed"]["tok_s"]) == ("ready", 40.0)  # last speed stays visible while idle
 
     p.options["model_hint"] = "sparkx"
     r = run(ol.check, p, handler)
@@ -314,3 +318,38 @@ def test_history_series_from_extra():
     store.add_check("q", "up", 12, "", {})
     assert store.latencies("gpu", extra_key="temp") == [60, 65]
     assert store.latencies("q") == [12]
+
+
+def test_benchmark_and_api(monkeypatch):
+    from ai_monitor.checkers import ollama as ol
+    ol._speed.clear()
+    sent = []
+
+    def handler(req):
+        if req.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3.5:9b"}]})
+        if req.url.path == "/api/generate":
+            sent.append(json.loads(req.content))
+            return httpx.Response(200, json={"eval_count": 96, "eval_duration": 2_000_000_000, "prompt_eval_count": 120,
+                                             "prompt_eval_duration": 150_000_000, "load_duration": 2_345_000_000})
+        return httpx.Response(200, json={"models": []})
+
+    p = Provider("q", "Q", "ollama", options={"model_hint": "qwen"})
+    r = run(ol.benchmark, p, handler)
+    assert (r["tok_s"], r["prompt_tok_s"], r["load_s"], r["source"]) == (48.0, 800.0, 2.3, "bench")
+    assert sent[0]["options"]["num_predict"] == 96 and "keep_alive" not in sent[0]
+
+    async def fake_bench(p, client):
+        return {"tok_s": 12.5}
+
+    async def fake_check(p, client):
+        return CheckResult("up", "ok")
+
+    monkeypatch.setattr(ol, "benchmark", fake_bench)
+    monkeypatch.setitem(checkers.CHECKERS, "ollama", fake_check)
+    cfg = Config(providers=[p, Provider("g", "G", "gpu")])
+    app = create_app(cfg, store=Store(":memory:"), start=False)
+    with TestClient(app) as client:
+        assert client.post("/api/bench/q").json() == {"tok_s": 12.5}
+        assert app.state.monitor.state["q"]["detail"] == "ok"  # card refreshed immediately
+        assert client.post("/api/bench/g").status_code == 404

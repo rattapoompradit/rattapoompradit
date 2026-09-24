@@ -1,12 +1,17 @@
 """Local models served by Ollama.
 
 States shown on the card (extra["state"]):
-  active   loaded in memory (/api/ps): VRAM, GPU/CPU split, unload countdown, measured tokens/sec
+  active   loaded in memory (/api/ps): VRAM, GPU/CPU split, unload countdown
   ready    installed (/api/tags) but not loaded; it loads on the next request — this is normal, not an error
   missing  Ollama is running but no installed model matches model_hint
 Ollama itself unreachable -> the engine reports "down".
+
+Speed (extra["speed"], last known value, kept while the model is idle):
+  auto   every speed_probe_interval_s, 16 tokens, only when the model is already loaded
+  bench  on request from the dashboard (benchmark()): may load the model; also measures prompt speed and load time
 """
 
+import logging
 import os
 import time
 from datetime import datetime
@@ -16,8 +21,16 @@ import httpx
 from ..config import Provider
 from ..models import CheckResult
 
+log = logging.getLogger(__name__)
 DEFAULT_BASE = "http://127.0.0.1:11434"
-_speed: dict[str, dict] = {}  # provider id -> {"tok_s", "at"} from the last speed probe
+_speed: dict[str, dict] = {}  # provider id -> {"tok_s", "prompt_tok_s", "load_s", "at", "source"}
+BENCH_PROMPT = (
+    "Summarise the following in three sentences, then list five key terms. "
+    "Local language models run entirely on your own computer. They use the graphics card memory to hold the model "
+    "weights, and when a model is larger than that memory part of it runs on the processor instead, which is much "
+    "slower. Speed is measured in tokens per second, both for reading the prompt and for writing the answer. "
+    "Loading a model from disk takes a few seconds the first time it is used after being idle."
+)
 
 
 def base_url(configured: str | None) -> str:
@@ -46,6 +59,10 @@ def _epoch(value) -> float | None:
         return None
 
 
+def _rate(count, duration_ns) -> float | None:
+    return round(count / (duration_ns / 1e9), 1) if count and duration_ns else None
+
+
 async def _measure_speed(p: Provider, client: httpx.AsyncClient, base: str, model: str, expires_at: float | None) -> None:
     """Generate a few tokens on an already-loaded model to measure tokens/sec (never loads a model)."""
     body = {"model": model, "prompt": "Hi", "stream": False, "options": {"num_predict": 16}}
@@ -54,9 +71,35 @@ async def _measure_speed(p: Provider, client: httpx.AsyncClient, base: str, mode
     r = await client.post(f"{base}/api/generate", json=body, timeout=max(p.timeout_s, 60))
     r.raise_for_status()
     data = r.json()
-    count, duration = data.get("eval_count"), data.get("eval_duration")
-    if count and duration:
-        _speed[p.id] = {"tok_s": round(count / (duration / 1e9), 1), "at": time.time()}
+    if tok_s := _rate(data.get("eval_count"), data.get("eval_duration")):
+        # keep prompt speed / load time from the last full benchmark; a 2-word prompt says nothing about them
+        _speed[p.id] = {**_speed.get(p.id, {}), "tok_s": tok_s, "at": time.time(), "source": "auto"}
+
+
+async def benchmark(p: Provider, client: httpx.AsyncClient) -> dict:
+    """Full speed test requested from the dashboard. Loads the model if needed (uses VRAM for Ollama's keep-alive)."""
+    base = base_url(p.options.get("base_url"))
+    r = await client.get(f"{base}/api/tags", timeout=p.timeout_s)
+    r.raise_for_status()
+    hint = str(p.options.get("model_hint") or "").lower()
+    model = next((m.get("name") for m in r.json().get("models") or [] if hint in m.get("name", "").lower()), None)
+    if not model:
+        raise ValueError(f"ไม่พบโมเดล '{hint}' ใน Ollama")
+    body = {"model": model, "prompt": f"[{time.time():.0f}] {BENCH_PROMPT}",  # timestamp defeats the prompt cache
+            "stream": False, "options": {"num_predict": 96, "temperature": 0}}
+    r = await client.post(f"{base}/api/generate", json=body, timeout=180)
+    r.raise_for_status()
+    data = r.json()
+    result = {
+        "tok_s": _rate(data.get("eval_count"), data.get("eval_duration")),
+        "prompt_tok_s": _rate(data.get("prompt_eval_count"), data.get("prompt_eval_duration")),
+        "load_s": round(data["load_duration"] / 1e9, 1) if data.get("load_duration") else None,
+        "at": time.time(),
+        "source": "bench",
+        "model": model,
+    }
+    _speed[p.id] = result
+    return result
 
 
 async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
@@ -89,6 +132,8 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     details = installed[model].get("details") or {}
     extra.update(model=model, params=details.get("parameter_size"), quant=details.get("quantization_level"),
                  disk_gb=round((installed[model].get("size") or 0) / 1024**3, 1) or None)
+    if speed := _speed.get(p.id):
+        extra["speed"] = speed
 
     if not active:
         extra.update(state="ready", loaded=False)
@@ -107,9 +152,9 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
         try:
             await _measure_speed(p, client, base, model, expires_at)
         except (httpx.HTTPError, ValueError):
-            _speed[p.id] = {"tok_s": None, "at": time.time()}
-    if speed := _speed.get(p.id):
-        extra.update(tok_s=speed["tok_s"], tok_s_at=speed["at"])
+            log.debug("speed probe for %s failed", p.id, exc_info=True)
+        if speed := _speed.get(p.id):
+            extra["speed"] = speed
 
     if gpu_pct is not None and gpu_pct < 100:
         detail = f"โหลดอยู่ · GPU {gpu_pct}% / CPU {100 - gpu_pct}% (ช้าลง)"

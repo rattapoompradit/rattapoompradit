@@ -93,6 +93,15 @@ function unloadText(exp) {
   return `ปล่อย VRAM ใน <b>${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}</b>`;
 }
 
+function speedBlock(s) {
+  if (!s || s.tok_s == null) return "";
+  const lv = level(-s.tok_s, -30, -10); // >=30 tok/s green, 10-30 yellow, <10 red
+  const when = Date.now() / 1000 - s.at < 60 ? "เพิ่งวัด" : `วัดไว้ ${ago(s.at)}ที่แล้ว`;
+  const more = [s.prompt_tok_s != null ? `อ่าน prompt ${num(Math.round(s.prompt_tok_s))} tok/s` : "",
+    s.load_s != null ? `โหลด ${s.load_s} วิ` : "", when].filter(Boolean).join(" · ");
+  return `<div class="speed lv-${lv}"><div><b>${s.tok_s}</b><span>tok/s</span></div><small title="${esc(more)}">${esc(more)}</small></div>`;
+}
+
 function localInner(p) {
   const x = p.extra || {};
   const spec = [x.params, x.quant].filter(Boolean).join(" · ");
@@ -105,10 +114,11 @@ function localInner(p) {
           ? `<span class="warn">CPU <b>${100 - gpu}%</b> · ช้าลง</span>` : `<span>VRAM <b>${x.vram_gb} GB</b></span>`}</div>
         <div class="split-track"><div class="split-gpu" style="width:${gpu}%"></div><div class="split-cpu" style="width:${100 - gpu}%"></div></div>
       </div>
-      <div class="stats">${x.tok_s != null ? stat("SPEED", x.tok_s, "tok/s") : ""}${x.context ? stat("CTX", num(x.context)) : ""}${api}</div>
+      ${speedBlock(x.speed)}
+      <div class="stats">${x.context ? stat("CTX", num(x.context)) : ""}${api}</div>
       ${x.expires_at ? `<div class="unload" data-exp="${x.expires_at}">${unloadText(x.expires_at)}</div>` : ""}`;
   } else if (x.state === "ready" && p.status !== "down") {
-    body = `<div class="stats">${x.disk_gb ? stat("SIZE", x.disk_gb, "GB") : ""}${api}${p.uptime_24h != null ? stat("24H", `${p.uptime_24h}%`) : ""}</div>
+    body = `${speedBlock(x.speed)}<div class="stats">${x.disk_gb ? stat("SIZE", x.disk_gb, "GB") : ""}${api}${p.uptime_24h != null ? stat("24H", `${p.uptime_24h}%`) : ""}</div>
       <div class="idle-note">◇ ไม่ได้ใช้ VRAM ตอนนี้ · โหลดเองเมื่อมีการเรียกใช้</div>`;
   } else if (x.state === "missing" && p.status !== "down") {
     body = `<div class="idle-note">โมเดลที่มีใน Ollama (แก้ model_hint ใน config.yaml):</div>
@@ -255,6 +265,8 @@ function openModal(id) {
     <div class="modal-main">${inner(p, last.providers)}</div>
     <aside class="modal-side">
       <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+      ${p.type === "ollama" && p.status !== "down" ? `<button class="bench" data-bench="${esc(p.id)}">⚡ วัดความเร็วตอนนี้</button>
+        <div class="bench-note">ถ้าโมเดลยังไม่โหลด จะโหลดเข้า VRAM ก่อน (รอสักครู่)</div>` : ""}
       ${sparkline(p.history || [], "spark big")}
       <div class="hint">แตะที่ใดก็ได้เพื่อปิด</div>
     </aside></div>`;
@@ -268,7 +280,30 @@ function closeModal() {
   clearTimeout(modalTimer);
 }
 
+async function runBench(btn) {
+  const id = btn.dataset.bench;
+  btn.disabled = true;
+  btn.textContent = "⏳ กำลังวัด… (โหลดโมเดลอาจใช้เวลา)";
+  clearTimeout(modalTimer);
+  try {
+    const r = await fetch(`/api/bench/${encodeURIComponent(id)}`, { method: "POST" });
+    const res = await r.json();
+    if (!r.ok || res.error) throw new Error(res.error || res.detail || r.status);
+    await refresh();
+    openModal(id);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = `วัดไม่สำเร็จ: ${err.message} — แตะเพื่อลองใหม่`;
+    modalTimer = setTimeout(closeModal, MODAL_AUTOCLOSE_MS);
+  }
+}
+
 document.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("[data-bench]");
+  if (btn) {
+    if (!btn.disabled) runBench(btn);
+    return;
+  }
   if (!document.getElementById("modal").hidden) return closeModal();
   const el = ev.target.closest("[data-id]");
   if (el) openModal(el.dataset.id);

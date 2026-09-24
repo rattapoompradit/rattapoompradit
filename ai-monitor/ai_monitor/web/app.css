@@ -227,6 +227,15 @@ body > * { position: relative; z-index: 1; }
 .unload::before { content: "⏱ "; }
 .unload b { font-family: var(--head); color: var(--cyan); font-variant-numeric: tabular-nums; }
 .idle-note { font-size: 1.8vh; color: var(--muted); }
+.speed { display: flex; align-items: baseline; gap: 1.4vh; min-width: 0; }
+.speed div { display: flex; align-items: baseline; gap: 0.6vh; flex: none; }
+.speed b { font-family: var(--head); font-weight: 900; font-size: 4.4vh; color: var(--lv); text-shadow: 0 0 1.4vh var(--lv); line-height: 1; }
+.speed span { font-family: var(--head); font-size: 1.4vh; letter-spacing: 0.15em; color: var(--muted); }
+.speed small { font-size: 1.6vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bench { font: 600 2.2vh var(--body); color: #031018; background: linear-gradient(90deg, var(--cyan), var(--violet)); border: 0;
+  border-radius: 1vh; padding: 1.4vh 2vh; cursor: pointer; box-shadow: 0 0 2vh rgba(34, 228, 255, 0.35); }
+.bench:disabled { opacity: 0.7; cursor: progress; animation: blink 1.2s ease-in-out infinite; }
+.bench-note { font-size: 1.6vh; color: var(--muted); margin-top: -0.6vh; }
 .foot { margin-top: auto; font-family: var(--mono); font-size: 1.4vh; letter-spacing: 0.05em; color: var(--muted); opacity: 0.75; }
 
 /* ---------- GPU card ---------- */
@@ -285,6 +294,7 @@ html.night body { filter: brightness(0.55) saturate(0.85); }
   .name, .hermes .name { font-size: 19px; } .code { font-size: 24px; } .core { width: 64px; height: 64px; } .core span { font-size: 22px; }
   .detail, .sub, .th, .stat, .bar-head, .chip, .tile small, .console, .tk, .pill span, .timebox small, .usage-error, .gpu-name, .stale-badge, .modal-side dl, .split-head, .unload, .idle-note { font-size: 13px; }
   .foot { font-size: 11px; } .split-track { height: 10px; }
+  .speed b { font-size: 26px; } .speed small, .bench-note { font-size: 12px; } .speed span { font-size: 10px; } .bench { font-size: 15px; padding: 10px 14px; }
   .ticker { order: 5; flex-basis: 100%; height: 26px; }
   .gauge { width: 110px; height: 110px; } .g-val b { font-size: 24px; } .gauge em, .g-sub { font-size: 10px; }
   .modal-card { grid-template-columns: 1fr; height: auto; max-height: 92vh; overflow: auto; } .modal-side { border-left: 0; padding-left: 0; } .spark.big { height: 90px; }

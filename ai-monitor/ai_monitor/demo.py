@@ -28,10 +28,12 @@ SAMPLES = {
     "nemotron": ("up", "API ใช้ได้", 640, {"model": "nvidia/nemotron-3-nano", "quota_pct": 72}),
     "sparkx": ("up", "พร้อมใช้ · จะโหลดเข้า VRAM เมื่อมีการเรียกใช้", 18, {
         "state": "ready", "loaded": False, "model": "sparkx-2.5:8b", "params": "8.2B", "quant": "Q5_K_M",
-        "disk_gb": 5.6, "ollama_version": "0.12.1", "server": "127.0.0.1:11434"}),
+        "disk_gb": 5.6, "ollama_version": "0.12.1", "server": "127.0.0.1:11434",
+        "speed": {"tok_s": 61.3, "prompt_tok_s": 1480, "load_s": 2.4, "at": time.time() - 5400, "source": "bench"}}),
     "qwen": ("up", "โหลดอยู่ใน VRAM 10.8 GB", 35, {
         "state": "active", "loaded": True, "model": "qwen3.5:14b", "params": "14.8B", "quant": "Q4_K_M",
-        "vram_gb": 10.8, "gpu_pct": 100, "tok_s": 52.4, "context": 8192, "expires_at": time.time() + 222,
+        "vram_gb": 10.8, "gpu_pct": 100, "context": 8192, "expires_at": time.time() + 222,
+        "speed": {"tok_s": 52.4, "prompt_tok_s": 912, "load_s": 3.1, "at": time.time() - 30, "source": "auto"},
         "ollama_version": "0.12.1", "server": "127.0.0.1:11434"}),
     "gpu": ("up", "67°C · VRAM 17.4/24.0 GB", None, {"temp": 67, "vram_pct": 73, "gpus": [{
         "index": 0, "name": "NVIDIA GeForce RTX 4090", "temp": 67, "util": 58, "mem_used_mb": 17818,
