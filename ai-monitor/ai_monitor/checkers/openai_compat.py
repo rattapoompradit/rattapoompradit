@@ -15,6 +15,8 @@ HERMES_VARS = {
     "ZAI_API_KEY": ("GLM_API_KEY", "GLM_BASE_URL"),
     "NVIDIA_API_KEY": ("NVIDIA_API_KEY", "NVIDIA_BASE_URL"),
 }
+# AI Monitor env name -> Hermes provider id in its credential pool (auth.json, `hermes auth add`)
+HERMES_POOL = {"MIMO_API_KEY": "xiaomi", "ZAI_API_KEY": "zai", "NVIDIA_API_KEY": "nvidia"}
 
 _last_probe: dict[str, float] = {}
 
@@ -57,21 +59,24 @@ def _quota(headers: httpx.Headers) -> int | None:
 
 def resolve_key(p: Provider) -> tuple[str, str, str]:
     """(key, base_url, source). key_from: "env" (AI Monitor .env only), "hermes" (Hermes first, with its
-    base URL if it sets one) or "auto" (default: AI Monitor .env, else Hermes)."""
+    base URL if it sets one) or "auto" (default: AI Monitor .env, else Hermes).
+    Hermes keys come from its .env, else its credential pool (auth.json, incl. profiles/*/auth.json)."""
     env = p.options.get("api_key_env")
     base = p.options["base_url"].rstrip("/")
     own = os.environ.get(env, "").strip() if env else ""
     mode = str(p.options.get("key_from", "auto")).lower()
     hermes_key_var, hermes_url_var = HERMES_VARS.get(env, (p.options.get("hermes_key"), p.options.get("hermes_base_url")))
-    if mode == "env" or not hermes_key_var or (mode == "auto" and own):
+    pool_provider = p.options.get("hermes_provider") or HERMES_POOL.get(env)
+    if mode == "env" or not (hermes_key_var or pool_provider) or (mode == "auto" and own):
         return own, base, ".env"
     home = hermes.resolve_home({"home": p.options.get("_hermes_home", "auto")})
     values = read_env_file(home / ".env")
-    theirs = values.get(p.options.get("hermes_key") or hermes_key_var, "").strip()
-    if not theirs:
-        return own, base, ".env"
-    url = values.get(p.options.get("hermes_base_url") or hermes_url_var or "", "").strip().rstrip("/")
-    return theirs, url or base, "Hermes"
+    env_url = values.get(p.options.get("hermes_base_url") or hermes_url_var or "", "").strip().rstrip("/")
+    if theirs := values.get(p.options.get("hermes_key") or hermes_key_var or "", "").strip():
+        return theirs, env_url or base, "Hermes"
+    if pool_provider and (cred := hermes.read_pool_credential(home, pool_provider)):
+        return cred[0], cred[1] or env_url or base, "Hermes"
+    return own, base, ".env"
 
 
 async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:

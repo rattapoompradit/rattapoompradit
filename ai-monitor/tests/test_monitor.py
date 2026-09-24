@@ -506,3 +506,31 @@ def test_config_passes_hermes_home_to_api_checks(tmp_path):
         "providers:\n  - {id: h, type: hermes, home: 'D:/h'}\n  - {id: m, type: openai_compat, base_url: 'x'}\n", encoding="utf-8")
     cfg = load_config(tmp_path / "c.yaml")
     assert cfg.providers[1].options["_hermes_home"] == "D:/h"
+
+
+def test_api_key_from_hermes_credential_pool(tmp_path, monkeypatch):
+    from ai_monitor.checkers.hermes import read_pool_credential
+    from ai_monitor.checkers.openai_compat import resolve_key
+    home = tmp_path / "hermes"
+    (home / "profiles" / "mimo").mkdir(parents=True)
+    (home / ".env").write_text("# XIAOMI_API_KEY=your_key_here\n", encoding="utf-8")  # commented out, like the sample
+    (home / "profiles" / "mimo" / "auth.json").write_text(json.dumps({"credential_pool": {"xiaomi": [
+        {"access_token": "tp-exhausted", "priority": 0, "last_status": "exhausted"},
+        {"access_token": "tp-second", "priority": 2},
+        {"access_token": "tp-first", "priority": 1, "base_url": "https://token-plan-sgp.x/v1/"},
+        {"access_token": "", "priority": -1}]}}), encoding="utf-8")
+    assert read_pool_credential(home, "xiaomi") == ("tp-first", "https://token-plan-sgp.x/v1")
+    assert read_pool_credential(home, "zai") is None
+
+    monkeypatch.delenv("MIMO_API_KEY", raising=False)
+    p = Provider("m", "M", "openai_compat", options={"base_url": "https://api.x/v1", "api_key_env": "MIMO_API_KEY",
+                                                     "key_from": "hermes", "_hermes_home": str(home)})
+    assert resolve_key(p) == ("tp-first", "https://token-plan-sgp.x/v1", "Hermes")
+
+
+def test_hermes_home_ignores_profile_override(tmp_path, monkeypatch):
+    from ai_monitor.checkers.hermes import default_home
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes" / "profiles" / "mimo"))
+    assert default_home() == tmp_path / "hermes"
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "custom"))
+    assert default_home() == tmp_path / "custom"

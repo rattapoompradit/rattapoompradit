@@ -48,6 +48,7 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 
 การ์ด MiMo / Z.ai / Nemotron ใช้ key ใน `.env` ของ AI Monitor ก่อน ถ้าว่างจะใช้ key ที่ Hermes ใช้อยู่ (`%LOCALAPPDATA%\\hermes\\.env`: `XIAOMI_API_KEY`, `GLM_API_KEY`, `NVIDIA_API_KEY`) โดยอ่านอย่างเดียว
 
+- หา key ของ Hermes จาก `.env` ก่อน ถ้าไม่มีจะอ่าน **credential pool** (`auth.json` และ `profiles\\*\\auth.json` ที่ได้จาก `hermes auth add`) รวมถึง base URL ที่บันทึกไว้กับ key นั้น
 - `key_from: hermes` ใช้ของ Hermes ก่อนเสมอ พร้อม base URL ของ Hermes (`XIAOMI_BASE_URL` ฯลฯ) ถ้าตั้งไว้ — ค่าเริ่มต้นของ MiMo
 - `key_from: env` ใช้เฉพาะ `.env` ของ AI Monitor
 - การ์ดจะบอกท้ายข้อความว่า "key จาก Hermes" เมื่อใช้ key ของ Hermes

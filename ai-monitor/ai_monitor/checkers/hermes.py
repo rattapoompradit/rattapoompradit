@@ -31,7 +31,9 @@ _IGNORED_PLATFORM_STATES = {None, "", "connected", "disabled"}
 
 def default_home() -> Path:
     if env := os.environ.get("HERMES_HOME"):
-        return Path(env).expanduser()
+        home = Path(env).expanduser()
+        # A profile home (<root>/profiles/<name>) has no gateway of its own; monitor the main Hermes home.
+        return home.parent.parent if home.parent.name == "profiles" else home
     if sys.platform == "win32":
         base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
         return Path(base) / "hermes"
@@ -157,6 +159,26 @@ def read_status(home: Path, gateway_required: bool = True) -> CheckResult:
     if broken:
         return CheckResult("degraded", ", ".join(broken), extra=extra)
     return CheckResult("up", f"Gateway ทำงาน ({len(platforms)} ช่องทาง)", extra=extra)
+
+
+def read_pool_credential(home: Path, provider: str) -> tuple[str, str | None] | None:
+    """(key, base_url) from Hermes' credential pool (`hermes auth add`), read-only.
+
+    Looks in <home>/auth.json, then <home>/profiles/*/auth.json: credential_pool.<provider> is a list of
+    {"access_token", "priority", "base_url", "inference_base_url", "last_status"}; lowest priority wins,
+    credentials marked exhausted go last."""
+    files = [home / "auth.json", *sorted((home / "profiles").glob("*/auth.json"))]
+    for path in files:
+        data = _read_json(path)
+        pool = (data or {}).get("credential_pool") if isinstance(data, dict) else None
+        entries = pool.get(provider) if isinstance(pool, dict) else None
+        usable = [e for e in entries or [] if isinstance(e, dict) and str(e.get("access_token") or "").strip()]
+        if not usable:
+            continue
+        best = min(usable, key=lambda e: (e.get("last_status") == "exhausted", e.get("priority") or 0))
+        url = best.get("inference_base_url") or best.get("base_url")
+        return str(best["access_token"]).strip(), (str(url).rstrip("/") if url else None)
+    return None
 
 
 def resolve_home(options: dict) -> Path:
