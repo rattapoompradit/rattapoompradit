@@ -10,6 +10,16 @@ defaults:
   degraded_latency_ms: 5000 # ช้ากว่านี้ = สีเหลือง
   fail_threshold: 2         # ล้มกี่ครั้งติดกันถึงขึ้นสีแดง
 
+# Hermes Router: แสดงผลการตัดสินใจล่าสุด (อ่านอย่างเดียว ไม่แก้ logic การ route)
+# ไม่ตั้งค่า = หาไฟล์ router*.json / router*.jsonl ใน Hermes home ให้เอง ถ้าไม่เจอจะแสดง ROUTER: N/A
+router:
+  auto_discover: true
+  # file: "%LOCALAPPDATA%\\hermes\\logs\\router.jsonl"   # JSON หรือ JSON-lines (บรรทัดล่าสุด = การตัดสินใจล่าสุด)
+  # log: "%LOCALAPPDATA%\\hermes\\logs\\agent.log"        # log ข้อความธรรมดา + pattern ด้านล่าง
+  # pattern: 'route=(?P<route>\w+) model=(?P<model>\S+) reason="(?P<reason>[^"]*)" status=(?P<status>\w+)'
+  # url: http://127.0.0.1:9000/router/last                  # endpoint ที่คืน JSON
+  # fields: {model: "target.name"}                          # ถ้าชื่อ field ไม่ตรงค่ามาตรฐาน
+
 providers:
   - id: hermes
     name: Hermes Agent

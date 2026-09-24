@@ -403,3 +403,49 @@ def test_ollama_autostart(monkeypatch):
     except httpx.ConnectError:
         pass
     assert len(started) == 1
+
+
+def test_router_status_sources(tmp_path):
+    from ai_monitor.router_status import read_router, normalize_status
+
+    # nothing configured, nothing found -> N/A (never guessed)
+    r = read_router({}, tmp_path)
+    assert r["available"] is False
+
+    # JSON-lines: the latest decision is the last routing record
+    (tmp_path / "logs").mkdir()
+    log = tmp_path / "logs" / "router.jsonl"
+    log.write_text("\n".join([
+        json.dumps({"route": "code", "model": "qwen3.5:14b", "reason": "Code task", "status": "done", "ts": 1893456000}),
+        json.dumps({"event": "heartbeat"}),
+        json.dumps({"decision": {"route_type": "direct", "selected_model": "sparkx-2.5"}, "state": "running"}),
+        "not json",
+    ]), encoding="utf-8")
+    r = read_router({}, tmp_path)  # auto-discovered
+    assert (r["available"], r["route"], r["model"], r["status"], r["reason"]) == (True, "DIRECT", "sparkx-2.5", "RUNNING", None)
+    assert r["at"] == log.stat().st_mtime  # no timestamp in the record -> file time
+
+    # explicit file + dotted field override, millisecond timestamp
+    f = tmp_path / "last.json"
+    f.write_text(json.dumps({"kind": "complex", "target": {"name": "glm-flash"}, "why": "Multi-step", "ts": 1893456000000}), encoding="utf-8")
+    r = read_router({"file": str(f), "fields": {"route": "kind", "model": "target.name"}}, None)
+    assert (r["route"], r["model"], r["reason"], r["at"]) == ("COMPLEX", "glm-flash", "Multi-step", 1893456000)
+
+    # plain-text log + regex
+    t = tmp_path / "agent.log"
+    t.write_text('x\nroute=KANBAN model=nemotron reason="Board update" status=routing\nother line\n', encoding="utf-8")
+    pattern = r'route=(?P<route>\w+) model=(?P<model>\S+) reason="(?P<reason>[^"]*)" status=(?P<status>\w+)'
+    r = read_router({"log": str(t), "pattern": pattern}, None)
+    assert (r["route"], r["model"], r["reason"], r["status"]) == ("KANBAN", "nemotron", "Board update", "ROUTING")
+    assert read_router({"log": str(t)}, None)["available"] is False  # pattern required
+
+    assert read_router({"file": str(tmp_path / "missing.json")}, None)["available"] is False
+    assert read_router({"auto_discover": False}, tmp_path)["available"] is False
+    assert [normalize_status(s) for s in ("failed", "IDLE", "weird", None)] == ["ERROR", "IDLE", "WEIRD", None]
+
+
+def test_router_api():
+    cfg = Config(providers=[])
+    app = create_app(cfg, store=Store(":memory:"), start=False, router_reader=lambda: {"available": False, "note": "x"})
+    with TestClient(app) as client:
+        assert client.get("/api/router").json() == {"available": False, "note": "x"}

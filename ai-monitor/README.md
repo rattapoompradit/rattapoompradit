@@ -70,6 +70,19 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 - ครั้งแรก Windows SmartScreen อาจเตือน เพราะไฟล์ไม่ได้ลงลายเซ็นดิจิทัล → กด **More info → Run anyway**
 - ใช้ WebView2 ที่มากับ Windows 10/11 อยู่แล้ว, log อยู่ที่ `ai-monitor.log` ข้าง exe
 
+## Hermes Router Status
+
+แถบเล็กใต้การ์ด Hermes Agent แสดงการตัดสินใจล่าสุดของ Hermes Router: `ROUTER` (DIRECT / CODE / COMPLEX / KANBAN), `MODEL` ที่เลือกจริง, `REASON` และสถานะ `IDLE / ROUTING / RUNNING / ERROR` (อัปเดตทุก 3 วินาที)
+
+- **อ่านอย่างเดียว** ไม่เปลี่ยน logic การ route และไม่ hardcode model: ทุกค่ามาจากข้อมูลที่ router เขียนไว้
+- ไม่มีข้อมูล → แสดง `ROUTER: N/A` (ไม่เดา) ค่าไหนไม่มีในข้อมูลก็แสดง `N/A`
+- แหล่งข้อมูล (ตั้งใน `config.yaml` → `router:`):
+  - ค่าเริ่มต้น: หาไฟล์ `router*.json` / `router*.jsonl` ใน Hermes home และโฟลเดอร์ `logs/` ให้เอง
+  - `file:` ไฟล์ JSON หรือ JSON-lines (บรรทัดล่าสุด = การตัดสินใจล่าสุด)
+  - `log:` + `pattern:` log ข้อความธรรมดา อ่านด้วย regex ที่มี named group `route` / `model` / `reason` / `status`
+  - `url:` endpoint ที่คืน JSON
+- ชื่อ field ที่อ่านได้เอง: `route`/`route_type`/`category`, `model`/`selected_model`/`target_model`, `reason`/`why`, `status`/`state`, `ts`/`timestamp` (ซ้อนใน `decision` / `routing` ได้) ถ้าไม่ตรงใช้ `fields:` เช่น `{model: "target.name"}`
+
 ## แก้ปัญหา
 
 ดับเบิลคลิก **`check.bat`** จะเช็คทุกตัวครั้งเดียวแล้วแสดงสาเหตุ เช่น

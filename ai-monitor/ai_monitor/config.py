@@ -31,6 +31,7 @@ class Config:
     port: int = 8765
     db_path: Path = Path("ai-monitor.db")
     retention_days: int = 30
+    router: dict[str, Any] = field(default_factory=dict)  # Hermes Router status source (router_status.py)
 
 
 def load_env(path: Path) -> None:
@@ -68,4 +69,5 @@ def load_config(path: Path) -> Config:
         port=int(raw.get("port", 8765)),
         db_path=db_path,
         retention_days=int(raw.get("retention_days", 30)),
+        router=raw.get("router") or {},
     )

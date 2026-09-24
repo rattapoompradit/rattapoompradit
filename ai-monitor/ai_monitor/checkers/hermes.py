@@ -159,7 +159,10 @@ def read_status(home: Path, gateway_required: bool = True) -> CheckResult:
     return CheckResult("up", f"Gateway ทำงาน ({len(platforms)} ช่องทาง)", extra=extra)
 
 
+def resolve_home(options: dict) -> Path:
+    home = options.get("home", "auto")
+    return default_home() if home in (None, "auto") else Path(os.path.expandvars(str(home))).expanduser()
+
+
 async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
-    home = p.options.get("home", "auto")
-    home = default_home() if home in (None, "auto") else Path(os.path.expandvars(str(home))).expanduser()
-    return await asyncio.to_thread(read_status, home, bool(p.options.get("gateway_required", True)))
+    return await asyncio.to_thread(read_status, resolve_home(p.options), bool(p.options.get("gateway_required", True)))

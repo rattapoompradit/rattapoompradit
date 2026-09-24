@@ -57,3 +57,9 @@ def seed(monitor: Monitor) -> None:
                                       ("sparkx", "down", "up", "Ollama กลับมาแล้ว"),
                                       ("claude", "up", "degraded", "claude.ai: degraded performance")]:
         monitor.store.add_event(provider, frm, to, detail)
+
+
+def router_sample() -> dict:
+    """Sample Hermes Router decision for demo mode (real mode reads it from the router's own output)."""
+    return {"available": True, "route": "DIRECT", "model": "sparkx-2.5:8b", "reason": "Simple task",
+            "status": "RUNNING", "at": time.time() - 12, "source": "demo", "read_at": time.time()}

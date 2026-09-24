@@ -313,6 +313,44 @@ document.addEventListener("click", (ev) => {
 });
 document.addEventListener("keydown", (ev) => ev.key === "Escape" && closeModal());
 
+/* ---------- Hermes Router status bar (monitoring only) ---------- */
+
+const ROUTER_REFRESH_MS = 3000;
+const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+function renderRouter(r) {
+  const el = document.getElementById("router");
+  if (!r || !r.available) {
+    el.className = "router-bar na";
+    el.innerHTML = `<div class="rrow"><span class="rk">ROUTER</span><b class="rv">N/A</b></div>
+      <div class="rrow"><span class="reason" title="${esc(r && r.note)}">${esc((r && r.note) || "ยังไม่มีข้อมูล routing")}</span></div>`;
+    return;
+  }
+  const status = r.status || "N/A";
+  el.className = `router-bar rs-${slug(status)}`;
+  el.innerHTML = `<div class="rrow">
+      <span class="rk">ROUTER</span><b class="route rt-${slug(r.route)}">${esc(r.route || "N/A")}</b>
+      <span class="rk">MODEL</span><b class="rv" title="${esc(r.model || "N/A")}">${esc(r.model || "N/A")}</b>
+      <span class="rstat"><i></i>${esc(status)}</span>
+    </div>
+    <div class="rrow">
+      <span class="rk">REASON</span><span class="reason" title="${esc(r.reason || "")}">${esc(r.reason || "N/A")}</span>
+      <small title="${esc(r.source || "")}">${r.at ? ago(r.at) + (Date.now() / 1000 - r.at < 60 ? "" : "ที่แล้ว") : ""}</small>
+    </div>`;
+}
+
+let routerLast = null;
+async function refreshRouter() {
+  try {
+    const r = await fetch("/api/router", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    routerLast = await r.json();
+  } catch {
+    routerLast = { available: false, note: "เชื่อมต่อ AI Monitor ไม่ได้" };
+  }
+  renderRouter(routerLast);
+}
+
 /* ---------- render loop ---------- */
 
 let last = { providers: [], events: [] };
@@ -358,5 +396,7 @@ async function refresh() {
 
 tick();
 refresh();
+refreshRouter();
+setInterval(refreshRouter, ROUTER_REFRESH_MS);
 setInterval(refresh, REFRESH_MS);
 setInterval(tick, 1000);
