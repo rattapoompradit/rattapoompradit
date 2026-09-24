@@ -74,7 +74,7 @@ class Store:
     def recent_events(self, limit: int = 8) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT ts, provider, from_status, to_status, detail FROM events ORDER BY ts DESC LIMIT ?", (limit,)
+                "SELECT ts, provider, from_status, to_status, detail FROM events ORDER BY ts DESC, id DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(zip(("ts", "provider", "from", "to", "detail"), r)) for r in rows]
 

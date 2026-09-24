@@ -365,8 +365,41 @@ def test_desktop_helpers(tmp_path, monkeypatch):
 
     monkeypatch.setattr(desktop, "bundled", lambda name: ROOT / name)
     desktop.ensure_files(tmp_path)
-    assert (tmp_path / "config.yaml").read_text() == (ROOT / "config.yaml").read_text()
+    assert (tmp_path / "config.yaml").read_bytes() == (ROOT / "config.yaml").read_bytes()
     assert (tmp_path / ".env").is_file()
-    (tmp_path / "config.yaml").write_text("mine")
+    (tmp_path / "config.yaml").write_text("mine", encoding="utf-8")
     desktop.ensure_files(tmp_path)
-    assert (tmp_path / "config.yaml").read_text() == "mine"  # never overwritten
+    assert (tmp_path / "config.yaml").read_text(encoding="utf-8") == "mine"  # never overwritten
+
+
+def test_ollama_autostart(monkeypatch):
+    from ai_monitor.checkers import ollama as ol
+    started = []
+    monkeypatch.setattr(ol.shutil, "which", lambda name: "/usr/bin/ollama")
+    monkeypatch.setattr(ol.subprocess, "Popen", lambda args, **kw: started.append(args))
+    ol._autostart_at.clear()
+
+    def refused(req):
+        raise httpx.ConnectError("refused", request=req)
+
+    p = Provider("q", "Q", "ollama", options={"model_hint": "qwen"})
+    r = run(ol.check, p, refused)
+    assert (r.status, r.extra["state"]) == ("degraded", "starting") and started == [["/usr/bin/ollama", "serve"]]
+    r = run(ol.check, p, refused)  # within cooldown: waits, does not spawn again
+    assert r.extra["state"] == "starting" and len(started) == 1
+
+    ol._autostart_at.clear()
+    p.options["auto_start"] = False
+    try:
+        run(ol.check, p, refused)
+        raise AssertionError("expected ConnectError")
+    except httpx.ConnectError:
+        pass
+    assert len(started) == 1
+
+    p.options.update(auto_start=True, base_url="http://192.168.1.9:11434")  # never for another machine
+    try:
+        run(ol.check, p, refused)
+    except httpx.ConnectError:
+        pass
+    assert len(started) == 1

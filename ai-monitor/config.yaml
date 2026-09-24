@@ -67,6 +67,7 @@ providers:
     group: Local
     type: ollama
     base_url: auto            # auto = ใช้ OLLAMA_HOST ถ้าตั้งไว้ ไม่งั้น http://127.0.0.1:11434
+    auto_start: true          # Ollama ไม่ได้รัน -> เปิด `ollama serve` ให้เองแบบซ่อนหน้าต่าง
     model_hint: spark         # แก้ให้ตรงกับชื่อใน `ollama list`
     # speed_probe: false      # ปิดการวัด tokens/sec (วัดเฉพาะตอนโมเดลโหลดอยู่แล้ว ทุก 10 นาที, 16 tokens)
 
@@ -75,6 +76,7 @@ providers:
     group: Local
     type: ollama
     base_url: auto
+    auto_start: true
     model_hint: qwen3.5
 
   - id: gpu

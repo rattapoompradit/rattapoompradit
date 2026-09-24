@@ -4,7 +4,7 @@ States shown on the card (extra["state"]):
   active   loaded in memory (/api/ps): VRAM, GPU/CPU split, unload countdown
   ready    installed (/api/tags) but not loaded; it loads on the next request — this is normal, not an error
   missing  Ollama is running but no installed model matches model_hint
-Ollama itself unreachable -> the engine reports "down".
+Ollama itself unreachable -> the engine reports "down" (after trying to start `ollama serve` when auto_start).
 
 Speed (extra["speed"], last known value, kept while the model is idle):
   auto   every speed_probe_interval_s, 16 tokens, only when the model is already loaded
@@ -13,6 +13,10 @@ Speed (extra["speed"], last known value, kept while the model is idle):
 
 import logging
 import os
+import shutil
+import subprocess
+import sys
+import tempfile
 import time
 from datetime import datetime
 
@@ -50,6 +54,32 @@ def base_url(configured: str | None) -> str:
     if hostname in ("", "0.0.0.0", "[::]", "::"):
         hostname = "127.0.0.1"
     return f"{scheme}://{hostname}:{port or 11434}"
+
+
+_LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
+_autostart_at: dict[str, float] = {}  # base url -> when we last tried `ollama serve`
+AUTOSTART_COOLDOWN_S = 120
+
+
+def _try_autostart(base: str) -> bool:
+    """Start `ollama serve` hidden in the background if Ollama on this machine is not running."""
+    host = base.split("://", 1)[-1].rsplit(":", 1)[0]
+    exe = shutil.which("ollama")
+    if host not in _LOCAL_HOSTS or not exe or time.time() - _autostart_at.get(base, 0) < AUTOSTART_COOLDOWN_S:
+        return False
+    _autostart_at[base] = time.time()
+    flags = (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP) if sys.platform == "win32" else 0
+    log_file = open(os.path.join(tempfile.gettempdir(), "ai-monitor-ollama-serve.log"), "ab")
+    try:
+        subprocess.Popen([exe, "serve"], stdin=subprocess.DEVNULL, stdout=log_file, stderr=log_file,
+                         creationflags=flags, start_new_session=sys.platform != "win32")
+    except OSError:
+        log.warning("could not start ollama serve", exc_info=True)
+        return False
+    finally:
+        log_file.close()
+    log.info("started `ollama serve` for %s", base)
+    return True
 
 
 def _epoch(value) -> float | None:
@@ -105,7 +135,14 @@ async def benchmark(p: Provider, client: httpx.AsyncClient) -> dict:
 async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     base = base_url(p.options.get("base_url"))
     started = time.monotonic()
-    r = await client.get(f"{base}/api/tags", timeout=p.timeout_s)
+    try:
+        r = await client.get(f"{base}/api/tags", timeout=p.timeout_s)
+    except httpx.ConnectError:
+        if p.options.get("auto_start", True) and _try_autostart(base):
+            return CheckResult("degraded", "Ollama ไม่ได้รัน · กำลังเปิดให้อัตโนมัติ…", extra={"state": "starting"})
+        if time.time() - _autostart_at.get(base, 0) < AUTOSTART_COOLDOWN_S:
+            return CheckResult("degraded", "กำลังรอ Ollama เปิด…", extra={"state": "starting"})
+        raise
     latency = int((time.monotonic() - started) * 1000)
     r.raise_for_status()
     installed = {m.get("name", ""): m for m in r.json().get("models") or []}

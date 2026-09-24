@@ -7,6 +7,7 @@ const LOCAL = {
   active: { code: "ACTIVE", label: "โหลดอยู่ใน VRAM" },
   ready: { code: "READY", label: "พร้อมใช้" },
   missing: { code: "MISSING", label: "ไม่พบโมเดล" },
+  starting: { code: "STARTING", label: "กำลังเปิด Ollama" },
 };
 const localState = (p) => (p.type === "ollama" && p.status !== "down" && p.extra ? LOCAL[p.extra.state] : null);
 const codeFor = (p) => (localState(p) || { code: CODE[p.status] }).code;
@@ -123,6 +124,8 @@ function localInner(p) {
   } else if (x.state === "missing" && p.status !== "down") {
     body = `<div class="idle-note">โมเดลที่มีใน Ollama (แก้ model_hint ใน config.yaml):</div>
       <div class="chips">${(x.available || []).slice(0, 6).map((n) => `<span class="chip idle">${esc(n)}</span>`).join("") || `<span class="chip idle">ยังไม่มีโมเดล</span>`}</div>`;
+  } else if (x.state === "starting") {
+    body = `<div class="idle-note">◇ เปิด <b>ollama serve</b> ในพื้นหลังแล้ว ปกติใช้เวลาไม่กี่วินาที</div>`;
   } else {
     body = `<div class="idle-note">เปิด Ollama แล้วรอสักครู่ หรือรัน check.bat เพื่อดูสาเหตุ</div>`;
   }
