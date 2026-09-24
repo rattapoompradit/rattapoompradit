@@ -1,4 +1,4 @@
-from . import hermes, ollama, openai_compat, status_page
+from . import gpu, hermes, ollama, openai_compat, status_page
 
 # type -> async check(provider, client) -> CheckResult
 CHECKERS = {
@@ -6,4 +6,5 @@ CHECKERS = {
     "openai_compat": openai_compat.check,
     "ollama": ollama.check,
     "hermes": hermes.check,
+    "gpu": gpu.check,
 }

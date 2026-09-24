@@ -37,8 +37,8 @@ def create_app(cfg: Config, store: Store | None = None, start: bool = True) -> F
         for p in cfg.providers:
             state = monitor.state.get(p.id) or {"status": "unknown", "detail": "กำลังเช็ค…", "extra": {}}
             providers.append({
-                "id": p.id, "name": p.name, "group": p.group, "type": p.type, **state,
-                "history": store.latencies(p.id),
+                "id": p.id, "name": p.name, "group": p.group, "type": p.type, "interval_s": p.interval_s, **state,
+                "history": store.latencies(p.id, extra_key="temp" if p.type == "gpu" else None),
                 "uptime_24h": store.uptime_pct(p.id, day_ago),
             })
         names = {p.id: p.name for p in cfg.providers}

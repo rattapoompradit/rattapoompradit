@@ -29,7 +29,7 @@ def run(checker, provider, handler):
 def test_example_config_loads():
     cfg = load_config(ROOT / "config.yaml")
     assert {p.type for p in cfg.providers} <= set(checkers.CHECKERS)
-    assert len(cfg.providers) == 8
+    assert len(cfg.providers) == 9
     hermes_p = next(p for p in cfg.providers if p.type == "hermes")
     assert hermes_p.interval_s == 15 and hermes_p.options["home"] == "auto"
 
@@ -223,3 +223,39 @@ def test_usage_codex_and_status_page_integration(tmp_path, monkeypatch):
     (tmp_path / "auth.json").write_text("{}")
     r = run(status_page.check, p, lambda req: httpx.Response(503))
     assert r.status == "unknown" and "Codex" in r.extra["usage"]["error"]
+
+
+def test_gpu_parse_and_status(monkeypatch):
+    import subprocess
+    from ai_monitor.checkers import gpu
+
+    out = "0, NVIDIA GeForce RTX 4090, 67, 58, 17818, 24564, 286.40, 450.00, 46\n1, Old GPU, 40, 0, 10, 2048, [N/A], [N/A], [Not Supported]\n"
+    gpus = gpu.parse(out)
+    assert gpus[0]["name"] == "NVIDIA GeForce RTX 4090" and gpus[0]["temp"] == 67 and gpus[1]["power_w"] is None
+
+    def fake_run(stdout, code=0):
+        return lambda exe, timeout: subprocess.CompletedProcess([exe], code, stdout=stdout, stderr="boom")
+
+    p = Provider("gpu", "GPU", "gpu", options={"nvidia_smi": "nvidia-smi"})
+    monkeypatch.setattr(gpu, "_run", fake_run(out))
+    r = asyncio.run(gpu.check(p, None))
+    assert (r.status, r.detail, r.extra["vram_pct"]) == ("up", "67°C · VRAM 17.4/24.0 GB", 73)
+
+    monkeypatch.setattr(gpu, "_run", fake_run(out.replace(", 67,", ", 84,", 1)))
+    assert asyncio.run(gpu.check(p, None)).status == "degraded"
+    monkeypatch.setattr(gpu, "_run", fake_run(out.replace(", 67,", ", 93,", 1)))
+    assert asyncio.run(gpu.check(p, None)).status == "down"
+    monkeypatch.setattr(gpu, "_run", fake_run("", code=9))
+    assert asyncio.run(gpu.check(p, None)).detail == "nvidia-smi error: boom"
+
+    monkeypatch.setattr(gpu.shutil, "which", lambda name: None)
+    assert asyncio.run(gpu.check(Provider("gpu", "GPU", "gpu"), None)).status == "unknown"
+
+
+def test_history_series_from_extra():
+    store = Store(":memory:")
+    for t in (60, 65):
+        store.add_check("gpu", "up", None, "", {"temp": t})
+    store.add_check("q", "up", 12, "", {})
+    assert store.latencies("gpu", extra_key="temp") == [60, 65]
+    assert store.latencies("q") == [12]

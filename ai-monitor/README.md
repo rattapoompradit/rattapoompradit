@@ -10,6 +10,13 @@ Dashboard สำหรับดูสถานะ AI ทุกตัว + Status
 | Cloud | ChatGPT, Claude | status page ทางการ + **แถบโควตา 5 ชม. / สัปดาห์** จากการล็อกอินของ Codex CLI / Claude Code |
 | Cloud / Free | MiMo, Z.ai GLM Flash, Nemotron 3 | `GET /models` ด้วย API key ใน `.env` แล้วหาชื่อโมเดลจาก `model_hint` ให้อัตโนมัติ |
 | Local | Sparkx 2.5, Qwen 3.5 | Ollama `/api/tags` + `/api/ps` (ติดตั้งอยู่ไหม, โหลดเข้า VRAM หรือยัง) |
+| Local | GPU (NVIDIA) | `nvidia-smi` ทุก 10 วินาที: อุณหภูมิ, VRAM, Utilization, Power, Fan + โมเดลไหนโหลดอยู่ใน VRAM |
+
+**UX บนจอ Xeneon Edge (ทัชสกรีน)**
+- แตะการ์ดใดก็ได้ → เปิดรายละเอียดเต็ม (ข้อความไม่ถูกตัด, เวลาเช็คล่าสุด, uptime, กราฟย้อนหลัง) แตะอีกครั้งหรือรอ 20 วินาทีจะปิดเอง
+- แถบบนสุด: สรุปจำนวน ปกติ/มีปัญหา/ล่ม + ตัววิ่งแสดงเหตุการณ์ล่าสุด + นาฬิกา + ไฟ SYNC (ขึ้น LINK LOST ถ้าโปรแกรมหลังบ้านหยุด)
+- การ์ดที่ข้อมูลไม่อัปเดตนานเกิน 3 รอบ จะจางลงและขึ้นป้าย "ข้อมูลเก่า"
+- 23:00–07:00 หน้าจอหรี่ลงอัตโนมัติ, ถ้าเปิด "ลดภาพเคลื่อนไหว" ใน Windows แอนิเมชันจะหยุด
 
 สี: 🟢 ปกติ · 🟡 มีปัญหา/ช้า/rate limit · 🔴 ล่ม (ต้องล้ม 2 ครั้งติดกัน การ์ดจะกะพริบ) · ⚪ ไม่ทราบ
 
@@ -45,7 +52,7 @@ Dashboard สำหรับดูสถานะ AI ทุกตัว + Status
 
 ## ปรับแต่ง
 
-ทุกอย่างอยู่ใน `config.yaml`: รอบเช็ค, timeout, เกณฑ์ความช้า, path ของ Hermes, `gateway_required`, `probe: true` (ยิง prompt จริง 1 token ทุก 30 นาทีเพื่อวัด latency จริง)
+ทุกอย่างอยู่ใน `config.yaml`: รอบเช็ค, timeout, เกณฑ์ความช้า, path ของ Hermes, `gateway_required`, เกณฑ์อุณหภูมิ GPU (`temp_warn_c` / `temp_crit_c`), `probe: true` (ยิง prompt จริง 1 token ทุก 30 นาทีเพื่อวัด latency จริง)
 
 ## พัฒนา
 

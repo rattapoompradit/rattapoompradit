@@ -75,3 +75,12 @@ providers:
     type: ollama
     base_url: http://localhost:11434
     model_hint: qwen3.5
+
+  - id: gpu
+    name: GPU
+    group: Local
+    type: gpu
+    interval_s: 10
+    temp_warn_c: 80           # เหลือง
+    temp_crit_c: 90           # แดง
+    vram_warn_pct: 95

@@ -49,11 +49,18 @@ class Store:
                 (time.time(), provider, from_status, to_status, detail),
             )
 
-    def latencies(self, provider: str, limit: int = 40) -> list[int | None]:
+    def latencies(self, provider: str, limit: int = 40, extra_key: str | None = None) -> list[float | None]:
+        """Recent latency values, or `extra[extra_key]` when given (oldest first)."""
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT latency_ms FROM checks WHERE provider = ? ORDER BY ts DESC LIMIT ?", (provider, limit)
-            ).fetchall()
+            if extra_key:
+                rows = self._conn.execute(
+                    "SELECT json_extract(extra_json, ?) FROM checks WHERE provider = ? ORDER BY ts DESC LIMIT ?",
+                    (f"$.{extra_key}", provider, limit),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT latency_ms FROM checks WHERE provider = ? ORDER BY ts DESC LIMIT ?", (provider, limit)
+                ).fetchall()
         return [r[0] for r in reversed(rows)]
 
     def uptime_pct(self, provider: str, since: float) -> float | None:

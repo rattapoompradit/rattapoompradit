@@ -28,6 +28,9 @@ SAMPLES = {
     "nemotron": ("up", "API ใช้ได้", 640, {"model": "nvidia/nemotron-3-nano", "quota_pct": 72}),
     "sparkx": ("down", "เชื่อมต่อไม่ได้ (Ollama ไม่ได้รัน?)", None, {}),
     "qwen": ("up", "โหลดอยู่ใน VRAM 10.8 GB", 35, {"model": "qwen3.5:14b", "loaded": True, "vram_gb": 10.8}),
+    "gpu": ("up", "67°C · VRAM 17.4/24.0 GB", None, {"temp": 67, "vram_pct": 73, "gpus": [{
+        "index": 0, "name": "NVIDIA GeForce RTX 4090", "temp": 67, "util": 58, "mem_used_mb": 17818,
+        "mem_total_mb": 24564, "power_w": 286.4, "power_limit_w": 450, "fan": 46}]}),
 }
 
 
@@ -39,7 +42,8 @@ def seed(monitor: Monitor) -> None:
         base = latency or 0
         for _ in range(40):
             value = int(base * rng.uniform(0.7, 1.4)) if latency else None
-            monitor.store.add_check(p.id, "up" if rng.random() > 0.05 else "degraded", value, "", {})
+            past = {"temp": rng.randint(58, 72)} if p.type == "gpu" else {}
+            monitor.store.add_check(p.id, "up" if rng.random() > 0.05 else "degraded", value, "", past)
         monitor.state[p.id] = {"status": status, "detail": detail, "latency_ms": latency, "extra": extra,
                                "checked_at": now, "since": now - rng.randint(120, 7200)}
     for provider, frm, to, detail in [("glm", "up", "degraded", "โดน rate limit (HTTP 429)"),

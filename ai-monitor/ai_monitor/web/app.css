@@ -50,7 +50,7 @@ body::after {
 }
 @keyframes scan { from { transform: translateY(-20vh); } to { transform: translateY(110vh); } }
 
-body { display: grid; grid-template-rows: 7.5vh minmax(0, 1fr); gap: var(--gap); padding: var(--gap); }
+body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 7.5vh minmax(0, 1fr); gap: var(--gap); padding: var(--gap); }
 body > * { position: relative; z-index: 1; }
 
 /* ---------- Top bar ---------- */
@@ -61,6 +61,8 @@ body > * { position: relative; z-index: 1; }
   border-radius: var(--r);
   background: linear-gradient(90deg, rgba(34, 228, 255, 0.08), rgba(155, 107, 255, 0.06) 60%, rgba(34, 228, 255, 0.04));
 }
+.topbar, .layout { min-width: 0; }
+.brand, .summary, .timebox { flex: none; }
 .brand { display: flex; align-items: center; gap: 1.4vh; }
 .brand b { font-family: var(--head); font-weight: 900; font-size: 2.8vh; letter-spacing: 0.35em; display: block;
   background: linear-gradient(90deg, var(--cyan), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -70,8 +72,8 @@ body > * { position: relative; z-index: 1; }
   mask: radial-gradient(circle, transparent 52%, #000 54%); animation: spin 6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.summary { display: flex; gap: 1.2vh; margin: 0 auto; }
-.pill { display: flex; align-items: baseline; gap: 0.8vh; padding: 0.5vh 1.6vh; border-radius: 99px;
+.summary { display: flex; gap: 1.2vh; }
+.pill { white-space: nowrap; display: flex; align-items: baseline; gap: 0.8vh; padding: 0.5vh 1.6vh; border-radius: 99px;
   border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); background: color-mix(in srgb, var(--c) 10%, transparent); }
 .pill b { font-family: var(--head); font-size: 2.6vh; color: var(--c); text-shadow: 0 0 1.2vh var(--c); }
 .pill span { font-size: 1.7vh; color: var(--muted); }
@@ -189,15 +191,70 @@ body > * { position: relative; z-index: 1; }
 .console div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .console div::before { content: "› "; color: var(--muted); }
 
-/* ---------- Event log card ---------- */
-.events { --c: var(--cyan); }
-.events .name { font-family: var(--head); font-size: 2vh; letter-spacing: 0.3em; }
-.events ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.9vh; min-height: 0; overflow: hidden; }
-.events li { display: grid; grid-template-columns: auto 1fr; gap: 0.2vh 1vh; font-size: 1.7vh; color: var(--muted); }
-.events time { font-family: var(--mono); font-size: 1.5vh; color: var(--cyan); }
-.events li div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.events li b { color: var(--text); font-weight: 600; }
 .to-up { color: var(--up); } .to-degraded { color: var(--degraded); } .to-down { color: var(--down); } .to-unknown { color: var(--unknown); }
+
+/* ---------- Event ticker (top bar) ---------- */
+.ticker { flex: 1 1 auto; min-width: 0; overflow: hidden; align-self: stretch; display: flex; align-items: center;
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.ticker-track { display: inline-flex; gap: 5vh; white-space: nowrap; animation: marquee var(--dur, 30s) linear infinite; padding-left: 2vh; }
+.ticker:hover .ticker-track { animation-play-state: paused; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+.tk { display: inline-flex; align-items: baseline; gap: 0.8vh; font-size: 1.9vh; color: var(--muted); }
+.tk::before { content: "◆"; color: var(--cyan); font-size: 1.2vh; text-shadow: 0 0 0.8vh var(--cyan); }
+.tk time { font-family: var(--mono); font-size: 1.6vh; color: var(--cyan); }
+.tk b { color: var(--text); font-weight: 600; }
+.tk span { font-family: var(--head); font-size: 1.4vh; letter-spacing: 0.12em; }
+.tk i { font-style: normal; color: var(--muted); }
+.ticker-idle { font-size: 1.8vh; color: var(--muted); padding-left: 2vh; }
+
+/* ---------- Touch feedback / stale data ---------- */
+.card[data-id] { cursor: pointer; transition: transform 0.15s ease, border-color 0.2s ease; }
+.card[data-id]:active { transform: scale(0.985); }
+.card.stale > :not(.stale-badge) { opacity: 0.45; filter: grayscale(0.7); }
+.stale-badge { position: absolute; right: 1.4vh; bottom: 1.2vh; font-size: 1.6vh; padding: 0.3vh 1vh; border-radius: 0.5vh;
+  color: var(--degraded); background: rgba(255, 197, 61, 0.1); border: 1px solid rgba(255, 197, 61, 0.35); }
+
+/* ---------- GPU card ---------- */
+.gpu-name { font-weight: 600; font-size: 2.2vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gpu-name .th { font-family: var(--head); font-size: 1.4vh; letter-spacing: 0.15em; color: var(--c); }
+.gpu-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.6vh; align-items: center; }
+.gauges { display: flex; gap: 1.2vh; }
+.gauge { position: relative; width: 17vh; height: 17vh; display: grid; place-items: center; }
+.gauge svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(135deg); overflow: visible; }
+.g-track, .g-fill { fill: none; stroke-width: 7; stroke-linecap: round; }
+.g-track { stroke: rgba(255, 255, 255, 0.07); stroke-dasharray: 75 100; }
+.g-fill { stroke: var(--lv); filter: drop-shadow(0 0 0.8vh var(--lv)); transition: stroke-dasharray 0.8s ease; }
+.g-val { display: flex; align-items: baseline; gap: 0.2vh; margin-top: -0.8vh; }
+.g-val b { font-family: var(--head); font-weight: 900; font-size: 4.2vh; color: var(--lv); text-shadow: 0 0 1.2vh var(--lv); }
+.g-val small { font-size: 1.6vh; color: var(--muted); }
+.gauge em { position: absolute; bottom: 1.4vh; font-style: normal; font-family: var(--head); font-size: 1.2vh; letter-spacing: 0.25em; color: var(--muted); }
+.g-sub { position: absolute; bottom: -1.2vh; font-size: 1.5vh; color: var(--muted); white-space: nowrap; }
+.lv-unknown { --lv: var(--unknown); }
+.meters { display: flex; flex-direction: column; gap: 1.1vh; min-width: 0; }
+.chip.idle { --k: var(--unknown); }
+
+/* ---------- Detail overlay ---------- */
+.modal { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+  background: rgba(2, 4, 10, 0.72); backdrop-filter: blur(6px); animation: fade 0.2s ease; }
+.modal[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } }
+.modal-card { width: min(92vw, 150vh); height: 84vh; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 2.4vh;
+  padding: 2.4vh 2.8vh; animation: pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2); cursor: pointer; }
+@keyframes pop { from { transform: scale(0.94); opacity: 0; } }
+.modal-main { display: flex; flex-direction: column; gap: 1vh; min-width: 0; min-height: 0; overflow: hidden; }
+.modal-card .detail, .modal-card .sub, .modal-card .console div { white-space: normal; }
+.modal-side { display: flex; flex-direction: column; gap: 1.4vh; min-width: 0; border-left: 1px solid var(--edge); padding-left: 2.4vh; }
+.modal-side dl { display: grid; grid-template-columns: auto 1fr; gap: 1vh 2vh; margin: 0; font-size: 2.1vh; }
+.modal-side dt { color: var(--muted); }
+.modal-side dd { margin: 0; overflow-wrap: anywhere; }
+.spark.big { height: 18vh; margin-top: auto; }
+.hint { font-size: 1.6vh; color: var(--muted); text-align: center; letter-spacing: 0.1em; }
+
+/* ---------- Night dimming (23:00–07:00) and reduced motion ---------- */
+html.night body { filter: brightness(0.55) saturate(0.85); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 
 /* ---------- Fallback for normal / narrow screens ---------- */
 @media (max-aspect-ratio: 2/1) {
@@ -211,7 +268,10 @@ body > * { position: relative; z-index: 1; }
   .brand b { font-size: 16px; } .brand small, .tag, .link, .stat em, .tile em { font-size: 9px; }
   .logo { width: 30px; height: 30px; } .clock { font-size: 22px; } .pill b { font-size: 18px; }
   .name, .hermes .name { font-size: 19px; } .code { font-size: 24px; } .core { width: 64px; height: 64px; } .core span { font-size: 22px; }
-  .detail, .sub, .th, .stat, .bar-head, .chip, .tile small, .console, .events li, .pill span, .timebox small, .usage-error { font-size: 13px; }
+  .detail, .sub, .th, .stat, .bar-head, .chip, .tile small, .console, .tk, .pill span, .timebox small, .usage-error, .gpu-name, .stale-badge, .modal-side dl { font-size: 13px; }
+  .ticker { order: 5; flex-basis: 100%; height: 26px; }
+  .gauge { width: 110px; height: 110px; } .g-val b { font-size: 24px; } .gauge em, .g-sub { font-size: 10px; }
+  .modal-card { grid-template-columns: 1fr; height: auto; max-height: 92vh; overflow: auto; } .modal-side { border-left: 0; padding-left: 0; } .spark.big { height: 90px; }
   .stat b, .bar-head b, .tile b { font-size: 15px; } .track { height: 10px; } .spark { height: 48px; }
   .dot { width: 10px; height: 10px; }
 }
