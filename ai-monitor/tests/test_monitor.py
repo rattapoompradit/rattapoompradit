@@ -517,9 +517,10 @@ def test_api_key_from_hermes_credential_pool(tmp_path, monkeypatch):
     (home / "profiles" / "mimo" / "auth.json").write_text(json.dumps({"credential_pool": {"xiaomi": [
         {"access_token": "tp-exhausted", "priority": 0, "last_status": "exhausted"},
         {"access_token": "tp-second", "priority": 2},
-        {"access_token": "tp-first", "priority": 1, "base_url": "https://token-plan-sgp.x/v1/"},
+        {"access_token": "tp-first", "priority": 1, "base_url": "https://api.x/v1/",
+         "inference_base_url": "https://token-plan-sgp.x/v1/"},
         {"access_token": "", "priority": -1}]}}), encoding="utf-8")
-    assert read_pool_credential(home, "xiaomi") == ("tp-first", "https://token-plan-sgp.x/v1")
+    assert read_pool_credential(home, "xiaomi") == ("tp-first", "https://token-plan-sgp.x/v1", "https://api.x/v1")
     assert read_pool_credential(home, "zai") is None
 
     monkeypatch.delenv("MIMO_API_KEY", raising=False)
@@ -567,3 +568,27 @@ def test_mimo_credit_estimate(tmp_path):
     assert bar["tokens"] == 11100 + 1100 + 55
     assert "mimo-v2.6-pro" in out["note"] and out["estimated"] is True
     assert credits.estimate({"monthly": 0}, home, now)["error"]
+
+
+def test_pool_default_base_url_does_not_override_config(tmp_path, monkeypatch):
+    """Regression (seen on the user's machine): `hermes auth add` stores the pay-as-you-go base_url with a
+    Token Plan key; config.yaml points at the Token Plan endpoint and must win, or MiMo returns 401."""
+    from ai_monitor.checkers.openai_compat import resolve_key
+    home = tmp_path / "hermes"
+    (home / "profiles" / "mimo").mkdir(parents=True)
+    (home / "profiles" / "mimo" / "auth.json").write_text(json.dumps({"credential_pool": {"xiaomi": [
+        {"access_token": "tp-key", "priority": 0, "base_url": "https://api.xiaomimimo.com/v1"}]}}), encoding="utf-8")
+    monkeypatch.delenv("MIMO_API_KEY", raising=False)
+    p = Provider("m", "M", "openai_compat", options={"base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
+                                                     "api_key_env": "MIMO_API_KEY", "key_from": "hermes",
+                                                     "_hermes_home": str(home)})
+    assert resolve_key(p) == ("tp-key", "https://token-plan-sgp.xiaomimimo.com/v1", "Hermes")
+
+
+def test_credit_rates_match_exact_model_only():
+    from ai_monitor.checkers.credits import _rate
+    rates = {"mimo-v2.6-pro": [2.5, 300, 600], "mimo-v2.6-flash": [2, 100, 200]}
+    assert _rate(rates, "mimo-v2.6-pro") == [2.5, 300, 600]
+    assert _rate(rates, "xiaomi/MiMo-V2.6-Pro:latest") == [2.5, 300, 600]
+    assert _rate(rates, "mimo-v2.6-pro-ultraspeed") is None
+    assert _rate(rates, "mimo-v2.6") is None

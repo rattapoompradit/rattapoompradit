@@ -161,8 +161,12 @@ def read_status(home: Path, gateway_required: bool = True) -> CheckResult:
     return CheckResult("up", f"Gateway ทำงาน ({len(platforms)} ช่องทาง)", extra=extra)
 
 
-def read_pool_credential(home: Path, provider: str) -> tuple[str, str | None] | None:
-    """(key, base_url) from Hermes' credential pool (`hermes auth add`), read-only.
+def read_pool_credential(home: Path, provider: str) -> tuple[str, str | None, str | None] | None:
+    """(key, inference_base_url, base_url) from Hermes' credential pool (`hermes auth add`), read-only.
+
+    inference_base_url is where Hermes actually routes the key; plain base_url is often just the default
+    `hermes auth add` fills in (e.g. the pay-as-you-go endpoint for a Token Plan key), so callers should
+    rank it below their own configuration.
 
     Looks in <home>/auth.json, then <home>/profiles/*/auth.json: credential_pool.<provider> is a list of
     {"access_token", "priority", "base_url", "inference_base_url", "last_status"}; lowest priority wins,
@@ -176,8 +180,10 @@ def read_pool_credential(home: Path, provider: str) -> tuple[str, str | None] | 
         if not usable:
             continue
         best = min(usable, key=lambda e: (e.get("last_status") == "exhausted", e.get("priority") or 0))
-        url = best.get("inference_base_url") or best.get("base_url")
-        return str(best["access_token"]).strip(), (str(url).rstrip("/") if url else None)
+        def url(key: str) -> str | None:
+            return str(best[key]).rstrip("/") if best.get(key) else None
+
+        return str(best["access_token"]).strip(), url("inference_base_url"), url("base_url")
     return None
 
 

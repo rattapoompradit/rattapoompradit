@@ -65,10 +65,13 @@ providers:
       renews_at: "2026-10-22T23:59:59Z"   # "Valid until" ในหน้า Plan usage (ต่ออายุอัตโนมัติทุก 30 วัน)
       cycle_days: 30
       match: mimo
-      rates:                              # credits ต่อ token: [input cache hit, input cache miss, output]
+      # credits ต่อ token: [input cache hit, input cache miss, output] ชื่อต้องตรงเป๊ะ (ไม่เดาอัตราให้รุ่นย่อย)
+      # ที่มา: mimo.mi.com/docs/en-US/quick-start/faq/token-plan (Usage & Quota) — หน้า price/token-plan ยังมีแค่ v2.5
+      rates:
+        mimo-v2.6-pro: [2.5, 300, 600]
+        mimo-v2.6-flash: [2, 100, 200]
         mimo-v2.5-pro: [2.5, 300, 600]
         mimo-v2.5: [2, 100, 200]
-        # mimo-v2.6-pro: [?, ?, ?]        # ใส่ตามหน้า mimo.mi.com/docs/en-US/price/token-plan
       offpeak_utc: [16, 24]               # 23:00-07:00 เวลาไทย ลด 20%
       offpeak_factor: 0.8
       console_url: https://platform.xiaomimimo.com/#/console/plan-manage

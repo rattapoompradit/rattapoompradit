@@ -76,7 +76,9 @@ def resolve_key(p: Provider) -> tuple[str, str, str]:
     if theirs := values.get(p.options.get("hermes_key") or hermes_key_var or "", "").strip():
         return theirs, env_url or base, "Hermes"
     if pool_provider and (cred := hermes.read_pool_credential(home, pool_provider)):
-        return cred[0], cred[1] or env_url or base, "Hermes"
+        key, inference_url, pool_url = cred
+        # Endpoint precedence: where Hermes really routes > Hermes .env > config.yaml > the pool's default base_url
+        return key, inference_url or env_url or base or pool_url, "Hermes"
     return own, base, ".env"
 
 

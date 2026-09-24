@@ -48,7 +48,7 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 
 การ์ด MiMo / Z.ai / Nemotron ใช้ key ใน `.env` ของ AI Monitor ก่อน ถ้าว่างจะใช้ key ที่ Hermes ใช้อยู่ (`%LOCALAPPDATA%\\hermes\\.env`: `XIAOMI_API_KEY`, `GLM_API_KEY`, `NVIDIA_API_KEY`) โดยอ่านอย่างเดียว
 
-- หา key ของ Hermes จาก `.env` ก่อน ถ้าไม่มีจะอ่าน **credential pool** (`auth.json` และ `profiles\\*\\auth.json` ที่ได้จาก `hermes auth add`) รวมถึง base URL ที่บันทึกไว้กับ key นั้น
+- หา key ของ Hermes จาก `.env` ก่อน ถ้าไม่มีจะอ่าน **credential pool** (`auth.json` และ `profiles\\*\\auth.json` ที่ได้จาก `hermes auth add`) โดย endpoint ใช้ `inference_base_url` ของ pool > `XIAOMI_BASE_URL` > `base_url` ใน config.yaml > `base_url` ของ pool
 - `key_from: hermes` ใช้ของ Hermes ก่อนเสมอ พร้อม base URL ของ Hermes (`XIAOMI_BASE_URL` ฯลฯ) ถ้าตั้งไว้ — ค่าเริ่มต้นของ MiMo
 - `key_from: env` ใช้เฉพาะ `.env` ของ AI Monitor
 - การ์ดจะบอกท้ายข้อความว่า "key จาก Hermes" เมื่อใช้ key ของ Hermes
@@ -60,7 +60,7 @@ MiMo ไม่มี API บอกโควตา แถบ **Credits (ประ
 - credits = cache hit × อัตรา 1 + cache miss × อัตรา 2 + output × อัตรา 3 (ตั้งใน `credits.rates`) และลด 20% ช่วง 16:00–24:00 UTC
 - รอบบิล 30 วัน นับจาก `credits.renews_at` (วัน "Valid until" ในหน้า Plan usage) ต่ออายุอัตโนมัติ
 - นับเฉพาะที่ Hermes ใช้ ถ้าใช้แพ็กเดียวกันกับเครื่องมืออื่น ตัวเลขจริงจะสูงกว่า ดูค่าจริงได้ที่หน้า console ของ MiMo
-- โมเดลที่ยังไม่มีอัตราใน `credits.rates` จะไม่ถูกนับ และการ์ดจะบอกชื่อไว้
+- ชื่อโมเดลต้องตรงกับ `credits.rates` เป๊ะ (รุ่นย่อยเช่น `-ultraspeed` ไม่ยืมอัตรา) โมเดลที่ไม่มีอัตราจะไม่ถูกนับ และการ์ดจะบอกชื่อไว้
 - `UP 24H` บนทุกการ์ด = % การเช็คที่สำเร็จใน 24 ชม. (availability) ไม่ใช่โควตา
 
 ### แถบโควตา ChatGPT / Claude

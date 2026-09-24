@@ -46,11 +46,19 @@ def cycle(renews_at: float, cycle_days: float, now: float) -> tuple[float, float
     return end - length, end
 
 
+def _model_id(name: str) -> str:
+    """"xiaomi/MiMo-V2.6-Pro:latest" -> "mimo-v2.6-pro" (drop vendor prefix and tag, lowercase)."""
+    return str(name).strip().lower().rsplit("/", 1)[-1].split(":", 1)[0]
+
+
 def _rate(rates: dict, model: str) -> list[float] | None:
-    """Longest configured model name contained in `model` (so mimo-v2.5-pro wins over mimo-v2.5)."""
-    name = model.lower()
-    hits = [k for k in rates if str(k).lower() in name]
-    return [float(x) for x in rates[max(hits, key=len)]] if hits else None
+    """Exact model match only: a variant such as mimo-v2.6-pro-ultraspeed can cost far more than
+    mimo-v2.6-pro, so it must not borrow that rate; unmatched models are reported, not guessed."""
+    wanted = _model_id(model)
+    for key, value in rates.items():
+        if _model_id(key) == wanted:
+            return [float(x) for x in value]
+    return None
 
 
 def _offpeak(ts: float, hours: list, factor: float) -> float:
