@@ -6,11 +6,9 @@ from pathlib import Path
 
 import uvicorn
 
-from .app import create_app
+from .app import build_app
 from .config import load_config, load_env
-from .demo import seed
 from .engine import check_all
-from .store import Store
 
 
 def main() -> None:
@@ -30,11 +28,7 @@ def main() -> None:
             latency = f" ({r.latency_ms} ms)" if r.latency_ms is not None else ""
             print(f"[{icons.get(r.status, r.status)}] {p.name:<16} {r.detail}{latency}")
         return
-    if args.demo:
-        app = create_app(cfg, store=Store(":memory:"), start=False)
-        seed(app.state.monitor)
-    else:
-        app = create_app(cfg)
+    app = build_app(cfg, args.demo)
     print(f"AI Monitor: http://{cfg.host}:{cfg.port}")
     uvicorn.run(app, host=cfg.host, port=cfg.port, log_level="warning")
 

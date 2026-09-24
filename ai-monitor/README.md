@@ -36,6 +36,8 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 5. ตรวจเครื่อง: GPU (`nvidia-smi`), รายชื่อโมเดลใน Ollama, โฟลเดอร์ Hermes, การล็อกอิน Claude Code / Codex, API key ใน `.env` แล้วบอกว่าอะไรยังขาด
 6. ถามว่าจะให้เปิดเองตอนเปิดเครื่องไหม แล้วเปิดโปรแกรมให้เลย
 
+ได้ทั้ง **`AI-Monitor.exe`** (แอปเดสก์ท็อป เปิดหน้าต่างเต็มจอบน Xeneon Edge เอง ไม่ต้องใช้ Edge) และไอคอน **AI Monitor** บนเดสก์ท็อป
+
 หลังติดตั้ง:
 - ใส่ API key ใน `%USERPROFILE%\ai-monitor\.env`
 - แก้ `model_hint` ของ Sparkx / Qwen ใน `config.yaml` ให้ตรงกับชื่อที่ตัวติดตั้งแสดง (จาก Ollama)
@@ -58,6 +60,15 @@ irm https://raw.githubusercontent.com/rattapoompradit/rattapoompradit/claude/hop
 ถ้าไปขึ้นผิดจอ ดูตำแหน่งจอใน **Settings → System → Display** (ถ้าวาง Xeneon Edge ไว้ใต้จอหลัก ปกติจะเป็น `0` กับความสูงของจอหลัก เช่น `1440`) แล้วแก้ 2 บรรทัดนี้ใน `run.bat`
 
 เปิดอัตโนมัติตอนเปิดเครื่องแบบทำเอง: กด `Win+R` → `shell:startup` → สร้าง shortcut ไปที่ `run.bat`
+
+## AI-Monitor.exe
+
+- build อัตโนมัติด้วย GitHub Actions ทุกครั้งที่อัปเดตโค้ด ดาวน์โหลดตรงได้ที่ [Releases → ai-monitor-latest](https://github.com/rattapoompradit/rattapoompradit/releases/tag/ai-monitor-latest)
+- วางไว้ในโฟลเดอร์เดียวกับ `config.yaml` / `.env` (ถ้าไม่มี จะสร้างค่าเริ่มต้นให้ตอนเปิดครั้งแรก)
+- ดับเบิลคลิก → เปิดเต็มจอบนจอ 32:9 เอง ปิดด้วย Alt+F4 (โปรแกรมหลังบ้านปิดตามไปด้วย)
+- ตัวเลือก: `AI-Monitor.exe --demo` (ข้อมูลสมมติ), `--windowed` (หน้าต่างปกติ)
+- ครั้งแรก Windows SmartScreen อาจเตือน เพราะไฟล์ไม่ได้ลงลายเซ็นดิจิทัล → กด **More info → Run anyway**
+- ใช้ WebView2 ที่มากับ Windows 10/11 อยู่แล้ว, log อยู่ที่ `ai-monitor.log` ข้าง exe
 
 ## แก้ปัญหา
 

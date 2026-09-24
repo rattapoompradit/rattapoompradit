@@ -55,6 +55,10 @@ def create_app(cfg: Config, store: Store | None = None, start: bool = True) -> F
         async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 result = await ollama.benchmark(p, client)
+            except httpx.ConnectError:
+                return {"error": "เชื่อมต่อ Ollama ไม่ได้"}
+            except httpx.TimeoutException:
+                return {"error": "Ollama ไม่ตอบภายในเวลาที่กำหนด"}
             except (httpx.HTTPError, ValueError) as exc:
                 return {"error": str(exc) or type(exc).__name__}
             await monitor.check_once(p, client)  # refresh the card right away
@@ -65,4 +69,15 @@ def create_app(cfg: Config, store: Store | None = None, start: bool = True) -> F
         return FileResponse(WEB / "index.html")
 
     app.mount("/static", StaticFiles(directory=WEB), name="static")
+    return app
+
+
+def build_app(cfg: Config, demo: bool = False) -> FastAPI:
+    """The app with real checks, or with sample data and no checks when `demo`."""
+    if not demo:
+        return create_app(cfg)
+    from .demo import seed
+
+    app = create_app(cfg, store=Store(":memory:"), start=False)
+    seed(app.state.monitor)
     return app

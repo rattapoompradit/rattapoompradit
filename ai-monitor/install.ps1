@@ -5,6 +5,7 @@ $ErrorActionPreference = "Stop"
 $Branch = "claude/hopeful-faraday-7c9bsw"
 $ZipUrl = "https://github.com/rattapoompradit/rattapoompradit/archive/refs/heads/$Branch.zip"
 $Dest = Join-Path $HOME "ai-monitor"
+$ExeUrl = "https://github.com/rattapoompradit/rattapoompradit/releases/download/ai-monitor-latest/AI-Monitor.exe"
 
 function Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Ok($msg) { Write-Host "  [OK]  $msg" -ForegroundColor Green }
@@ -46,6 +47,19 @@ Get-ChildItem $src -Force | Where-Object { $keep -notcontains $_.Name } | Copy-I
 Remove-Item $tmp -Recurse -Force
 if ($keep) { Ok ("Kept your existing: " + ($keep -join ", ")) }
 Ok "Files ready"
+
+# ---------- 2b. Desktop app (AI-Monitor.exe from the latest build) ----------
+Step "Downloading AI-Monitor.exe"
+Get-Process "AI-Monitor" -ErrorAction SilentlyContinue | Stop-Process -Force
+try {
+    Invoke-WebRequest $ExeUrl -OutFile (Join-Path $Dest "AI-Monitor.exe") -UseBasicParsing
+    Unblock-File (Join-Path $Dest "AI-Monitor.exe")
+    Ok "AI-Monitor.exe ready"
+} catch {
+    Warn "AI-Monitor.exe not available yet - run.bat will be used instead"
+}
+$Exe = Join-Path $Dest "AI-Monitor.exe"
+$Launcher = if (Test-Path $Exe) { $Exe } else { Join-Path $Dest "run.bat" }
 
 # ---------- 3. Virtual env + packages ----------
 Step "Installing Python packages"
@@ -90,24 +104,32 @@ foreach ($k in "MIMO_API_KEY", "ZAI_API_KEY", "NVIDIA_API_KEY") {
     if ($envText -match "(?m)^$k=\S+") { Ok "$k set" } else { Warn "$k empty in $Dest\.env" }
 }
 
-# ---------- 6. Start with Windows ----------
-Step "Auto-start"
+# ---------- 6. Shortcuts ----------
+Step "Shortcuts"
+function New-Shortcut($path) {
+    $sc = (New-Object -ComObject WScript.Shell).CreateShortcut($path)
+    $sc.TargetPath = $Launcher
+    $sc.WorkingDirectory = $Dest
+    if ($Launcher -like "*.bat") { $sc.WindowStyle = 7 }
+    $sc.Save()
+}
+New-Shortcut (Join-Path ([Environment]::GetFolderPath("Desktop")) "AI Monitor.lnk")
+Ok "Desktop shortcut: AI Monitor"
+$startup = Join-Path ([Environment]::GetFolderPath("Startup")) "AI Monitor.lnk"
 $answer = Read-Host "  Start AI Monitor automatically when Windows starts? (y/N)"
 if ($answer -match '^[yY]') {
-    $lnk = Join-Path ([Environment]::GetFolderPath("Startup")) "AI Monitor.lnk"
-    $sc = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-    $sc.TargetPath = Join-Path $Dest "run.bat"
-    $sc.WorkingDirectory = $Dest
-    $sc.WindowStyle = 7
-    $sc.Save()
+    New-Shortcut $startup
     Ok "Added to Startup"
+} elseif (Test-Path $startup) {
+    New-Shortcut $startup  # keep an existing auto-start, pointing at the current launcher
+    Ok "Existing auto-start updated"
 }
 
 Step "Done"
 Write-Host "  Folder : $Dest"
 Write-Host "  Edit   : .env (API keys), config.yaml (model names, thresholds)"
-Write-Host "  Demo   : $Dest\run.bat --demo"
-Write-Host "  Real   : $Dest\run.bat"
+Write-Host "  Open   : $Launcher   (or the 'AI Monitor' icon on the desktop)"
+Write-Host "  Demo   : add --demo      Normal window: add --windowed      Troubleshoot: check.bat"
 $answer = Read-Host "`n  Launch now with real data? (Y/n)"
-if ($answer -notmatch '^[nN]') { Start-Process -FilePath (Join-Path $Dest "run.bat") -WorkingDirectory $Dest }
+if ($answer -notmatch '^[nN]') { Start-Process -FilePath $Launcher -WorkingDirectory $Dest }
 }

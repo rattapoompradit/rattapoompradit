@@ -353,3 +353,20 @@ def test_benchmark_and_api(monkeypatch):
         assert client.post("/api/bench/q").json() == {"tok_s": 12.5}
         assert app.state.monitor.state["q"]["detail"] == "ok"  # card refreshed immediately
         assert client.post("/api/bench/g").status_code == 404
+
+
+def test_desktop_helpers(tmp_path, monkeypatch):
+    from types import SimpleNamespace as S
+    from ai_monitor import desktop
+    screens = [S(width=2560, height=1440), S(width=2560, height=720)]
+    assert desktop.pick_screen(screens) is screens[1]
+    assert desktop.pick_screen(screens[:1]) is screens[0]
+    assert desktop.pick_screen([]) is None
+
+    monkeypatch.setattr(desktop, "bundled", lambda name: ROOT / name)
+    desktop.ensure_files(tmp_path)
+    assert (tmp_path / "config.yaml").read_text() == (ROOT / "config.yaml").read_text()
+    assert (tmp_path / ".env").is_file()
+    (tmp_path / "config.yaml").write_text("mine")
+    desktop.ensure_files(tmp_path)
+    assert (tmp_path / "config.yaml").read_text() == "mine"  # never overwritten

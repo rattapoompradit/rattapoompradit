@@ -1,0 +1,64 @@
+name: AI Monitor EXE
+
+on:
+  push:
+    branches: [claude/hopeful-faraday-7c9bsw]
+    paths: ["ai-monitor/**", ".github/workflows/ai-monitor-exe.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ai-monitor
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -r requirements.txt pywebview pyinstaller pytest
+
+      - name: Test
+        run: python -m pytest -q
+
+      - name: Build AI-Monitor.exe
+        run: >
+          pyinstaller --noconfirm --onefile --noconsole --name AI-Monitor
+          --add-data "ai_monitor/web;ai_monitor/web"
+          --add-data "config.yaml;."
+          --add-data ".env.example;."
+          --collect-submodules uvicorn
+          desktop_main.py
+
+      - name: Smoke test (server + bundled web files)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\AI-Monitor.exe -ArgumentList "--selftest" -Wait -PassThru
+          Get-Content dist\selftest.txt
+          if ($p.ExitCode -ne 0) { Get-Content dist\ai-monitor.log -ErrorAction SilentlyContinue; exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI-Monitor
+          path: ai-monitor/dist/AI-Monitor.exe
+
+      - name: Publish to the "ai-monitor-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ai-monitor-latest
+          name: AI Monitor (latest build)
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          files: ai-monitor/dist/AI-Monitor.exe
+          body: |
+            Latest Windows build of AI Monitor from `${{ github.ref_name }}` (${{ github.sha }}).
+            Put AI-Monitor.exe in a folder (e.g. %USERPROFILE%\ai-monitor) and double-click it.
+            Flags: --demo (sample data), --windowed (normal window).
