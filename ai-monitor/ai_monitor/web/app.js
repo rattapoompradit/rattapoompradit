@@ -1,4 +1,4 @@
-const REFRESH_MS = 10000;
+let refreshMs = 3000; // replaced by ui_refresh_ms from /api/status (config.yaml)
 const MODAL_AUTOCLOSE_MS = 20000;
 const LABEL = { up: "ปกติ", degraded: "มีปัญหา", down: "ล่ม", unknown: "ไม่ทราบ" };
 const CODE = { up: "ONLINE", degraded: "WARNING", down: "OFFLINE", unknown: "STANDBY" };
@@ -428,9 +428,14 @@ async function refresh() {
   }
 }
 
+async function refreshLoop() {
+  await refresh();
+  if (last.ui_refresh_ms) refreshMs = last.ui_refresh_ms;
+  setTimeout(refreshLoop, refreshMs); // one request at a time: the next poll starts after this one finished
+}
+
 tick();
-refresh();
+refreshLoop();
 refreshRouter();
 setInterval(refreshRouter, ROUTER_REFRESH_MS);
-setInterval(refresh, REFRESH_MS);
 setInterval(tick, 1000);

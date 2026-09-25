@@ -9,6 +9,7 @@ defaults:
   timeout_s: 15
   degraded_latency_ms: 5000 # ช้ากว่านี้ = สีเหลือง
   fail_threshold: 2         # ล้มกี่ครั้งติดกันถึงขึ้นสีแดง
+  ui_refresh_ms: 3000       # หน้าจอดึงข้อมูลใหม่ทุกกี่ ms (1000-60000) — แก้แล้วรีสตาร์ท ไม่ต้อง build ใหม่
 
 # Hermes Router: แสดงผลการตัดสินใจล่าสุด (อ่านอย่างเดียว ไม่แก้ logic การ route)
 # ไม่ตั้งค่า = หาไฟล์ router*.json / router*.jsonl ใน Hermes home ให้เอง ถ้าไม่เจอจะแสดง ROUTER: N/A

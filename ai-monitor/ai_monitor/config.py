@@ -32,6 +32,7 @@ class Config:
     db_path: Path = Path("ai-monitor.db")
     retention_days: int = 30
     router: dict[str, Any] = field(default_factory=dict)  # Hermes Router status source (router_status.py)
+    ui_refresh_ms: int = 3000  # how often the dashboard page polls /api/status
 
 
 def read_env_file(path: Path) -> dict[str, str]:
@@ -84,4 +85,6 @@ def load_config(path: Path) -> Config:
         db_path=db_path,
         retention_days=int(raw.get("retention_days", 30)),
         router=raw.get("router") or {},
+        # accepted at the top level or under defaults:; clamped so a typo cannot hammer or freeze the page
+        ui_refresh_ms=min(60000, max(1000, int(raw.get("ui_refresh_ms") or (raw.get("defaults") or {}).get("ui_refresh_ms") or 3000))),
     )

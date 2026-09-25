@@ -123,7 +123,7 @@ MiMo ไม่มี API บอกโควตา แถบ **Credits (ประ
 
 ## ปรับแต่ง
 
-ทุกอย่างอยู่ใน `config.yaml`: รอบเช็ค, timeout, เกณฑ์ความช้า, path ของ Hermes, `gateway_required`, เกณฑ์อุณหภูมิ GPU (`temp_warn_c` / `temp_crit_c`), `probe: true` (ยิง prompt จริง 1 token ทุก 30 นาทีเพื่อวัด latency จริง)
+ทุกอย่างอยู่ใน `config.yaml`: ความถี่ที่หน้าจอดึงข้อมูล (`defaults.ui_refresh_ms`, ค่าเริ่มต้น 3000 ms, แก้แล้วรีสตาร์ทไม่ต้อง build ใหม่), รอบเช็ค, timeout, เกณฑ์ความช้า, path ของ Hermes, `gateway_required`, เกณฑ์อุณหภูมิ GPU (`temp_warn_c` / `temp_crit_c`), `probe: true` (ยิง prompt จริง 1 token ทุก 30 นาทีเพื่อวัด latency จริง)
 
 ## พัฒนา
 

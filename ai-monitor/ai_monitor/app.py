@@ -53,7 +53,7 @@ def create_app(cfg: Config, store: Store | None = None, start: bool = True,
             })
         names = {p.id: p.name for p in cfg.providers}
         events = [{**e, "name": names.get(e["provider"], e["provider"])} for e in store.recent_events()]
-        return {"generated_at": time.time(), "providers": providers, "events": events}
+        return {"generated_at": time.time(), "ui_refresh_ms": cfg.ui_refresh_ms, "providers": providers, "events": events}
 
     @app.get("/api/router")
     async def router() -> dict:

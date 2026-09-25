@@ -663,3 +663,17 @@ def test_hermes_kanban_counts(tmp_path, monkeypatch):
     make(home / "kanban" / "boards" / "work" / "kanban.db", [("6", "blocked", None), ("7", "review", None)])
     assert hermes._kanban(home, now) == {"boards": 2, "running": 1, "queued": 2, "blocked": 1, "review": 1, "done_today": 1}
     assert hermes._kanban(tmp_path / "empty", now) is None
+
+
+def test_ui_refresh_ms_from_config(tmp_path):
+    def cfg_with(text):
+        (tmp_path / "c.yaml").write_text(text, encoding="utf-8")
+        return load_config(tmp_path / "c.yaml")
+
+    assert cfg_with("providers: []\n").ui_refresh_ms == 3000
+    assert cfg_with("defaults:\n  ui_refresh_ms: 2000\nproviders: []\n").ui_refresh_ms == 2000
+    assert cfg_with("ui_refresh_ms: 5000\nproviders: []\n").ui_refresh_ms == 5000
+    assert cfg_with("ui_refresh_ms: 10\nproviders: []\n").ui_refresh_ms == 1000  # clamped
+    cfg = Config(providers=[], ui_refresh_ms=2500)
+    with TestClient(create_app(cfg, store=Store(":memory:"), start=False)) as client:
+        assert client.get("/api/status").json()["ui_refresh_ms"] == 2500
