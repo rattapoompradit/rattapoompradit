@@ -102,8 +102,10 @@ class Monitor:
 
     async def _loop(self, p: Provider, client: httpx.AsyncClient) -> None:
         while True:
+            started = time.monotonic()
             await self.check_once(p, client)
-            await asyncio.sleep(p.interval_s)
+            # interval_s is the time between check starts, so a 1-second card really updates every second
+            await asyncio.sleep(max(0.1, p.interval_s - (time.monotonic() - started)))
 
     async def _purge_loop(self) -> None:
         while True:

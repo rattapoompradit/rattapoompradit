@@ -10,7 +10,7 @@ Dashboard สำหรับดูสถานะ AI ทุกตัว + Status
 | Cloud | ChatGPT, Claude | status page ทางการ + **แถบโควตา 5 ชม. / สัปดาห์** จากการล็อกอินของ Codex CLI / Claude Code |
 | Cloud / Free | MiMo, Z.ai GLM Flash, Nemotron 3 | `GET /models` ด้วย API key ใน `.env` แล้วหาชื่อโมเดลจาก `model_hint` ให้อัตโนมัติ |
 | Local | Sparkx 2.5, Qwen 3.5 | Ollama: **ACTIVE** (โหลดอยู่: VRAM, สัดส่วน GPU/CPU, tokens/sec, เวลาที่จะปล่อย VRAM) · **READY** (ติดตั้งแล้ว ยังไม่โหลด = ปกติ) · **MISSING** (ชื่อไม่ตรง แสดงรายชื่อโมเดลที่มี) · **OFFLINE** (Ollama ไม่ได้รัน) |
-| Local | GPU (NVIDIA) | `nvidia-smi` ทุก 1 วินาที: อุณหภูมิ, VRAM, Utilization, Power, Fan + โมเดลไหนโหลดอยู่ใน VRAM + **CPU %, RAM และ CPU/RAM ที่ Ollama ใช้** + อุณหภูมิ CPU (ถ้าเปิด LibreHardwareMonitor) |
+| Local | GPU (NVIDIA) | NVML (อ่านเร็ว, ถ้าใช้ไม่ได้จะใช้ `nvidia-smi`) ทุก 1 วินาที: อุณหภูมิ, VRAM, Utilization, Power, Fan + โมเดลไหนโหลดอยู่ใน VRAM + **CPU %, RAM และ CPU/RAM ที่ Ollama ใช้** + อุณหภูมิ CPU (ถ้าเปิด LibreHardwareMonitor) |
 
 **Realtime สำหรับ Local:** หน้าจอดึงข้อมูลทุก 1 วินาที (`ui_refresh_ms`), GPU เช็คทุก 1 วินาที, Ollama ทุก 2 วินาที เมื่อโมเดลโหลดอยู่และ GPU util ≥ 30% การ์ดจะเป็น **GENERATING** (ม่วง กะพริบ) พร้อม `LIVE · GPU % · W · °C` — Ollama ไม่มี API บอกว่ากำลังตอบอยู่ จึงอนุมานจากโหลด GPU (ถ้ามีหลายโมเดลโหลดพร้อมกัน จะขึ้นทุกตัวที่โหลดอยู่)
 

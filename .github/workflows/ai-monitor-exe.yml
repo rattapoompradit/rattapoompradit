@@ -34,7 +34,7 @@ jobs:
           --add-data "ai_monitor/web;ai_monitor/web"
           --add-data "config.yaml;."
           --add-data ".env.example;."
-          --collect-submodules uvicorn
+          --collect-submodules uvicorn --hidden-import pynvml
           desktop_main.py
 
       - name: Smoke test (server + bundled web files)

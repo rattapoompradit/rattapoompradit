@@ -83,6 +83,7 @@ def test_openai_compat_probe_sends_one_token(monkeypatch):
 def test_ollama_states():
     from ai_monitor.checkers import ollama as ol
     ol._speed.clear()
+    ol._probe_at.clear()
     expires = "2030-01-01T00:00:00Z"
     loaded = []
     generated = []
@@ -323,6 +324,7 @@ def test_history_series_from_extra():
 def test_benchmark_and_api(monkeypatch):
     from ai_monitor.checkers import ollama as ol
     ol._speed.clear()
+    ol._probe_at.clear()
     sent = []
 
     def handler(req):
@@ -720,3 +722,50 @@ def test_gpu_card_cpu_ram_ollama_and_lhm_temp(monkeypatch):
     p = Provider("gpu", "GPU", "gpu", options={"nvidia_smi": "x", "cpu_temp_url": "http://127.0.0.1:8085/data.json"})
     r = run(gpu.check, p, lambda req: httpx.Response(200, json=lhm))
     assert (r.extra["cpu"]["util"], r.extra["cpu"]["temp"], r.extra["gpus"][0]["fan"]) == (42.0, 96.0, None)
+
+
+def test_ollama_speed_probe_does_not_hold_up_the_card(monkeypatch):
+    from ai_monitor.checkers import ollama as ol
+    ol._speed.clear()
+    ol._probe_at.clear()
+    monkeypatch.setattr(ol, "PROBE_WAIT_S", 0.05)
+
+    async def handler(req):
+        if req.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3.5:9b"}]})
+        if req.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": [{"name": "qwen3.5:9b", "size": 1, "size_vram": 1}]})
+        if req.url.path == "/api/generate":  # queued behind a long generation
+            await asyncio.sleep(5)
+            return httpx.Response(200, json={"eval_count": 16, "eval_duration": 400_000_000})
+        return httpx.Response(404)
+
+    p = Provider("q", "Q", "ollama", options={"model_hint": "qwen3.5"})
+    started = time.monotonic()
+    r = run(ol.check, p, handler)
+    assert time.monotonic() - started < 2 and r.extra["state"] == "active" and "speed" not in r.extra
+
+
+def test_gpu_nvml_backend(monkeypatch):
+    from types import SimpleNamespace as S
+    from ai_monitor.checkers import gpu
+
+    class NVMLError(Exception):
+        pass
+
+    def no_fan(h):
+        raise NVMLError("not supported")
+
+    nv = S(NVMLError=NVMLError, NVML_TEMPERATURE_GPU=0, nvmlDeviceGetCount=lambda: 1,
+           nvmlDeviceGetHandleByIndex=lambda i: i, nvmlDeviceGetName=lambda h: b"NVIDIA GeForce RTX 4060 Laptop GPU",
+           nvmlDeviceGetMemoryInfo=lambda h: S(used=2048 * 1024**2, total=8192 * 1024**2),
+           nvmlDeviceGetUtilizationRates=lambda h: S(gpu=37), nvmlDeviceGetPowerUsage=lambda h: 55_500,
+           nvmlDeviceGetEnforcedPowerLimit=lambda h: 140_000, nvmlDeviceGetTemperature=lambda h, s: 61,
+           nvmlDeviceGetFanSpeed=no_fan)
+    monkeypatch.setattr(gpu, "_nvml", nv)
+    monkeypatch.setattr(gpu, "_run", lambda *a: (_ for _ in ()).throw(AssertionError("nvidia-smi should not run")))
+    r = asyncio.run(gpu.check(Provider("gpu", "GPU", "gpu", options={"cpu": False}), None))
+    g = r.extra["gpus"][0]
+    assert (r.status, g["name"], g["temp"], g["util"], g["mem_used_mb"], g["power_w"], g["fan"]) == \
+        ("up", "NVIDIA GeForce RTX 4060 Laptop GPU", 61.0, 37.0, 2048, 55.5, None)
+    assert r.extra["vram_pct"] == 25 and "VRAM 2.0/8.0 GB" in r.detail

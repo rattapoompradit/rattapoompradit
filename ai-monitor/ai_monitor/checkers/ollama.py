@@ -11,6 +11,7 @@ Speed (extra["speed"], last known value, kept while the model is idle):
   bench  on request from the dashboard (benchmark()): may load the model; also measures prompt speed and load time
 """
 
+import asyncio
 import logging
 import os
 import shutil
@@ -28,6 +29,9 @@ from ..models import CheckResult
 log = logging.getLogger(__name__)
 DEFAULT_BASE = "http://127.0.0.1:11434"
 _speed: dict[str, dict] = {}  # provider id -> {"tok_s", "prompt_tok_s", "load_s", "at", "source"}
+_probes: dict[str, asyncio.Task] = {}  # provider id -> speed probe in flight
+_probe_at: dict[str, float] = {}  # provider id -> when the last probe started (also limits retries after a failure)
+PROBE_WAIT_S = 1.0  # a probe queued behind a long generation keeps running without holding up the card
 BENCH_PROMPT = (
     "Summarise the following in three sentences, then list five key terms. "
     "Local language models run entirely on your own computer. They use the graphics card memory to hold the model "
@@ -104,6 +108,13 @@ async def _measure_speed(p: Provider, client: httpx.AsyncClient, base: str, mode
     if tok_s := _rate(data.get("eval_count"), data.get("eval_duration")):
         # keep prompt speed / load time from the last full benchmark; a 2-word prompt says nothing about them
         _speed[p.id] = {**_speed.get(p.id, {}), "tok_s": tok_s, "at": time.time(), "source": "auto"}
+
+
+async def _probe(p: Provider, client: httpx.AsyncClient, base: str, model: str, expires_at: float | None) -> None:
+    try:
+        await _measure_speed(p, client, base, model, expires_at)
+    except Exception:  # noqa: BLE001 - a failed probe only means no new speed value
+        log.debug("speed probe for %s failed", p.id, exc_info=True)
 
 
 async def benchmark(p: Provider, client: httpx.AsyncClient) -> dict:
@@ -185,11 +196,13 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
                  expires_at=expires_at, context=m.get("context_length"))
 
     every = float(p.options.get("speed_probe_interval_s", 600))
-    if p.options.get("speed_probe", True) and time.time() - _speed.get(p.id, {}).get("at", 0) >= every:
-        try:
-            await _measure_speed(p, client, base, model, expires_at)
-        except (httpx.HTTPError, ValueError):
-            log.debug("speed probe for %s failed", p.id, exc_info=True)
+    busy = p.id in _probes and not _probes[p.id].done()
+    if p.options.get("speed_probe", True) and not busy and time.time() - _probe_at.get(p.id, 0) >= every:
+        # Ollama serves one request per model at a time, so the probe may wait behind a long generation:
+        # give it PROBE_WAIT_S, then let it finish in the background and pick up its result on a later check.
+        _probe_at[p.id] = time.time()
+        _probes[p.id] = task = asyncio.create_task(_probe(p, client, base, model, expires_at))
+        await asyncio.wait({task}, timeout=PROBE_WAIT_S)
         if speed := _speed.get(p.id):
             extra["speed"] = speed
 
