@@ -299,7 +299,10 @@ body > * { position: relative; z-index: 1; }
 .gauge em { position: absolute; bottom: 1.4vh; font-style: normal; font-family: var(--head); font-size: 1.2vh; letter-spacing: 0.25em; color: var(--muted); }
 .g-sub { position: absolute; bottom: -1.2vh; font-size: 1.5vh; color: var(--muted); white-space: nowrap; }
 .lv-unknown { --lv: var(--unknown); }
-.meters { display: flex; flex-direction: column; gap: 1.1vh; min-width: 0; }
+.meters { display: flex; flex-direction: column; gap: 0.8vh; min-width: 0; }
+.ollama-use { font-family: var(--head); font-size: 1.2vh; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ollama-use b { color: var(--text); font-size: 1.5vh; }
+.t-up { color: var(--up); } .t-degraded { color: var(--degraded); } .t-down { color: var(--down); font-weight: 700; }
 .chip.idle { --k: var(--unknown); }
 
 /* ---------- Detail overlay ---------- */

@@ -677,3 +677,46 @@ def test_ui_refresh_ms_from_config(tmp_path):
     cfg = Config(providers=[], ui_refresh_ms=2500)
     with TestClient(create_app(cfg, store=Store(":memory:"), start=False)) as client:
         assert client.get("/api/status").json()["ui_refresh_ms"] == 2500
+
+
+def test_gpu_card_cpu_ram_ollama_and_lhm_temp(monkeypatch):
+    import subprocess
+    from types import SimpleNamespace as S
+    from ai_monitor.checkers import gpu
+    gpu._procs.clear()
+
+    class FakeProc:
+        def __init__(self, pid, name, cpu, rss):
+            self.pid, self.info, self._cpu, self._rss = pid, {"name": name}, cpu, rss
+
+        def cpu_percent(self, interval=None):
+            return self._cpu
+
+        def memory_info(self):
+            return S(rss=self._rss)
+
+    procs = [FakeProc(1, "ollama.exe", 160.0, 2 * 1024**3), FakeProc(2, "ollama_llama_server.exe", 80.0, 4 * 1024**3),
+             FakeProc(3, "chrome.exe", 400.0, 1)]
+    monkeypatch.setattr(gpu.psutil, "process_iter", lambda attrs: iter(procs))
+    monkeypatch.setattr(gpu.psutil, "cpu_count", lambda: 8)
+    monkeypatch.setattr(gpu.psutil, "cpu_percent", lambda interval=None: 42.0)
+    monkeypatch.setattr(gpu.psutil, "virtual_memory", lambda: S(total=16 * 1024**3, available=4 * 1024**3, percent=75.0))
+    c = gpu.cpu_stats()
+    assert (c["util"], c["ram_used_gb"], c["ram_total_gb"], c["ram_pct"]) == (42.0, 12.0, 16.0, 75)
+    assert (c["ollama_cpu_pct"], c["ollama_ram_gb"]) == (30.0, 6.0)  # (160 + 80) / 8 cores
+
+    lhm = {"Text": "Sensor", "Value": "", "Children": [{"Text": "ACER-PC", "Value": "", "Children": [
+        {"Text": "Intel Core i7-13700HX", "Value": "", "ImageURL": "images_icon/cpu.png", "Children": [
+            {"Text": "Temperatures", "Value": "", "Children": [
+                {"Text": "CPU Core #1", "Value": "90.0 °C", "SensorId": "/intelcpu/0/temperature/0"},
+                {"Text": "CPU Package", "Value": "96,0 °C", "SensorId": "/intelcpu/0/temperature/16"}]}]},
+        {"Text": "NVIDIA GeForce RTX 4060 Laptop GPU", "Value": "", "ImageURL": "images_icon/nvidia.png", "Children": [
+            {"Text": "GPU Core", "Value": "55.0 °C", "SensorId": "/gpu-nvidia/0/temperature/0"}]}]}]}
+    assert gpu.lhm_cpu_temp(lhm) == 96.0
+    assert gpu.lhm_cpu_temp({"Text": "x", "Children": []}) is None
+
+    out = "0, RTX, 50, 10, 1000, 8000, 30, 100, [N/A]\n"
+    monkeypatch.setattr(gpu, "_run", lambda exe, timeout: subprocess.CompletedProcess([exe], 0, stdout=out, stderr=""))
+    p = Provider("gpu", "GPU", "gpu", options={"nvidia_smi": "x", "cpu_temp_url": "http://127.0.0.1:8085/data.json"})
+    r = run(gpu.check, p, lambda req: httpx.Response(200, json=lhm))
+    assert (r.extra["cpu"]["util"], r.extra["cpu"]["temp"], r.extra["gpus"][0]["fan"]) == (42.0, 96.0, None)

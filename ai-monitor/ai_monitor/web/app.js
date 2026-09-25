@@ -16,9 +16,14 @@ function gpuNow() {
   const g = ((last.providers || []).find((q) => q.type === "gpu") || {}).extra;
   return g && g.gpus && g.gpus[0] ? g.gpus[0] : null;
 }
+const GEN_OLLAMA_CPU_PCT = 20; // Ollama busy on the CPU = a model partly offloaded to CPU is generating
+function cpuNow() {
+  return ((last.providers || []).find((q) => q.type === "gpu") || { extra: {} }).extra.cpu || null;
+}
 const isGenerating = (p) => {
-  const g = gpuNow();
-  return p.type === "ollama" && p.status !== "down" && p.extra && p.extra.state === "active" && g && g.util >= GEN_UTIL_PCT;
+  if (!(p.type === "ollama" && p.status !== "down" && p.extra && p.extra.state === "active")) return false;
+  const g = gpuNow(), c = cpuNow();
+  return (g && g.util >= GEN_UTIL_PCT) || (c && c.ollama_cpu_pct >= GEN_OLLAMA_CPU_PCT);
 };
 const localState = (p) => (isGenerating(p) ? LOCAL.generating
   : p.type === "ollama" && p.status !== "down" && p.extra ? LOCAL[p.extra.state] : null);
@@ -125,8 +130,8 @@ function localInner(p) {
   const spec = [x.params, x.quant].filter(Boolean).join(" · ");
   const api = p.latency_ms != null ? stat("API", num(p.latency_ms), "ms") : "";
   let body;
-  const g = isGenerating(p) ? gpuNow() : null;
-  const live = g ? `<div class="live"><i></i>LIVE · GPU <b>${Math.round(g.util)}%</b>${g.power_w != null ? ` · <b>${Math.round(g.power_w)}</b> W` : ""}${g.temp != null ? ` · <b>${Math.round(g.temp)}</b>°C` : ""}</div>` : "";
+  const gen = isGenerating(p), g = gen ? gpuNow() : null, c = gen ? cpuNow() : null;
+  const live = gen ? `<div class="live"><i></i>LIVE${g ? ` · GPU <b>${Math.round(g.util)}%</b>` : ""}${c && c.ollama_cpu_pct != null ? ` · CPU <b>${Math.round(c.ollama_cpu_pct)}%</b>` : ""}${g && g.power_w != null ? ` · <b>${Math.round(g.power_w)}</b> W` : ""}${g && g.temp != null ? ` · <b>${Math.round(g.temp)}</b>°C` : ""}</div>` : "";
   if (x.state === "active" && p.status !== "down") {
     const gpu = x.gpu_pct ?? 100;
     body = `${live}<div class="split">
@@ -193,6 +198,7 @@ function providerInner(p) {
 }
 
 function gpuInner(p, providers) {
+  const cpu = (p.extra || {}).cpu;
   const x = p.extra || {}, gpus = x.gpus || [], g = gpus[0];
   const tag = gpus.length > 1 ? `${p.group} · ${gpus.length} GPU` : p.group;
   if (!g) return `${head(p, tag)}${stateLine(p)}<div class="detail">${esc(p.detail)}</div>`;
@@ -209,7 +215,11 @@ function gpuInner(p, providers) {
       <div class="meters">
         ${bar("UTIL", g.util, g.util != null ? `<b>${Math.round(g.util)}%</b>` : "N/A", level(g.util, 90, 101))}
         ${bar("POWER", powerPct, g.power_w != null ? `<b>${Math.round(g.power_w)}</b> W` : "N/A", level(powerPct, 85, 97))}
-        ${bar("FAN", g.fan, g.fan != null ? `<b>${Math.round(g.fan)}%</b>` : "N/A", level(g.fan, 85, 101))}
+        ${g.fan != null ? bar("FAN", g.fan, `<b>${Math.round(g.fan)}%</b>`, level(g.fan, 85, 101)) : ""}
+        ${cpu ? bar(cpu.temp != null ? `CPU · <span class="t-${level(cpu.temp, 85, 95)}">${Math.round(cpu.temp)}°C</span>` : "CPU", cpu.util,
+          `<b>${Math.round(cpu.util)}%</b>`, level(cpu.util, 80, 95)) : ""}
+        ${cpu ? bar("RAM", cpu.ram_pct, `<b>${cpu.ram_used_gb}</b> / ${cpu.ram_total_gb} GB`, level(cpu.ram_pct, 85, 95)) : ""}
+        ${cpu && cpu.ollama_cpu_pct != null ? `<div class="ollama-use">OLLAMA · CPU <b>${Math.round(cpu.ollama_cpu_pct)}%</b> · RAM <b>${cpu.ollama_ram_gb}</b> GB</div>` : ""}
       </div>
     </div>
     <div class="chips">${loaded.length ? loaded.map((q) =>

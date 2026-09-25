@@ -47,7 +47,9 @@ SAMPLES = {
         "ollama_version": "0.12.1", "server": "127.0.0.1:11434"}),
     "gpu": ("up", "67°C · VRAM 17.4/24.0 GB", None, {"temp": 67, "vram_pct": 73, "gpus": [{
         "index": 0, "name": "NVIDIA GeForce RTX 4090", "temp": 67, "util": 58, "mem_used_mb": 17818,
-        "mem_total_mb": 24564, "power_w": 286.4, "power_limit_w": 450, "fan": 46}]}),
+        "mem_total_mb": 24564, "power_w": 286.4, "power_limit_w": 450, "fan": None}],
+        "cpu": {"util": 38, "cores": 16, "ram_used_gb": 21.4, "ram_total_gb": 32.0, "ram_pct": 67,
+                "ollama_cpu_pct": 24.5, "ollama_ram_gb": 6.2, "temp": 96}}),
 }
 
 

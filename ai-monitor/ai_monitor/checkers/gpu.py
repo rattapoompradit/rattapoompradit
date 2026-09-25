@@ -1,4 +1,6 @@
-"""NVIDIA GPU stats from `nvidia-smi` (temperature, VRAM, utilization, power, fan)."""
+"""NVIDIA GPU stats from `nvidia-smi` (temperature, VRAM, utilization, power, fan), plus CPU / RAM, how much
+CPU Ollama uses (a model that does not fit in VRAM runs partly on the CPU) and, optionally, CPU temperature
+from LibreHardwareMonitor's web server (Windows has no standard non-admin way to read it)."""
 
 import asyncio
 import shutil
@@ -6,6 +8,7 @@ import subprocess
 import sys
 
 import httpx
+import psutil
 
 from ..config import Provider
 from ..models import CheckResult
@@ -39,7 +42,79 @@ def _run(exe: str, timeout: float) -> subprocess.CompletedProcess:
                           capture_output=True, text=True, timeout=timeout, creationflags=flags)
 
 
+_procs: dict[int, psutil.Process] = {}  # kept between checks: cpu_percent() measures since the previous call
+CPU_TEMP_SENSORS = ("cpu package", "core (tctl/tdie)", "package", "cpu cores", "core average")
+
+
+def cpu_stats() -> dict:
+    """Whole-machine CPU % and RAM, and CPU % / RAM of Ollama processes (% of the whole machine)."""
+    cores = psutil.cpu_count() or 1
+    mem = psutil.virtual_memory()
+    ollama_cpu, ollama_ram, seen = 0.0, 0, set()
+    for proc in psutil.process_iter(["name"]):
+        if "ollama" not in (proc.info.get("name") or "").lower():
+            continue
+        seen.add(proc.pid)
+        tracked = _procs.setdefault(proc.pid, proc)
+        try:
+            ollama_cpu += tracked.cpu_percent(None)  # 0.0 on the first sighting, real value from the next check
+            ollama_ram += tracked.memory_info().rss
+        except psutil.Error:
+            continue
+    for pid in set(_procs) - seen:
+        _procs.pop(pid, None)
+    return {
+        "util": psutil.cpu_percent(None),
+        "cores": cores,
+        "ram_used_gb": round((mem.total - mem.available) / 1024**3, 1),
+        "ram_total_gb": round(mem.total / 1024**3, 1),
+        "ram_pct": round(mem.percent),
+        "ollama_cpu_pct": round(ollama_cpu / cores, 1) if seen else None,
+        "ollama_ram_gb": round(ollama_ram / 1024**3, 1) if seen else None,
+    }
+
+
+def lhm_cpu_temp(data: dict) -> float | None:
+    """CPU temperature from LibreHardwareMonitor's /data.json tree (Remote Web Server)."""
+    found: list[tuple[int, float]] = []
+
+    def walk(node: dict, in_cpu: bool) -> None:
+        text = str(node.get("Text", ""))
+        value = str(node.get("Value", ""))
+        sensor = str(node.get("SensorId", "")).lower()  # e.g. /intelcpu/0/temperature/0, /amdcpu/0/...
+        is_cpu_hw = "cpu" in str(node.get("ImageURL", "")).lower() or any(
+            k in text.lower() for k in ("intel core", "ryzen", "cpu")) and not value.endswith("°C")
+        in_cpu = in_cpu or is_cpu_hw or "cpu/" in sensor
+        if in_cpu and value.endswith("°C") and text.lower() in CPU_TEMP_SENSORS:
+            try:
+                found.append((CPU_TEMP_SENSORS.index(text.lower()), float(value[:-2].strip().replace(",", "."))))
+            except ValueError:
+                pass
+        for child in node.get("Children") or []:
+            if isinstance(child, dict):
+                walk(child, in_cpu)
+
+    walk(data, False)
+    return min(found)[1] if found else None
+
+
 async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
+    result = await _check_gpu(p)
+    if p.options.get("cpu", True):
+        try:
+            result.extra["cpu"] = await asyncio.to_thread(cpu_stats)
+        except psutil.Error:
+            pass
+    if (url := p.options.get("cpu_temp_url")) and "cpu" in result.extra:
+        try:
+            r = await client.get(url, timeout=2)
+            result.extra["cpu"]["temp"] = lhm_cpu_temp(r.json())
+        except (httpx.HTTPError, ValueError):
+            result.extra["cpu"]["temp"] = None
+    return result
+
+
+async def _check_gpu(p: Provider) -> CheckResult:
     exe = p.options.get("nvidia_smi") or shutil.which("nvidia-smi")
     if not exe:
         return CheckResult("unknown", "ไม่พบ nvidia-smi (ติดตั้ง NVIDIA driver หรือยัง?)")

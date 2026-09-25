@@ -10,7 +10,7 @@ Dashboard สำหรับดูสถานะ AI ทุกตัว + Status
 | Cloud | ChatGPT, Claude | status page ทางการ + **แถบโควตา 5 ชม. / สัปดาห์** จากการล็อกอินของ Codex CLI / Claude Code |
 | Cloud / Free | MiMo, Z.ai GLM Flash, Nemotron 3 | `GET /models` ด้วย API key ใน `.env` แล้วหาชื่อโมเดลจาก `model_hint` ให้อัตโนมัติ |
 | Local | Sparkx 2.5, Qwen 3.5 | Ollama: **ACTIVE** (โหลดอยู่: VRAM, สัดส่วน GPU/CPU, tokens/sec, เวลาที่จะปล่อย VRAM) · **READY** (ติดตั้งแล้ว ยังไม่โหลด = ปกติ) · **MISSING** (ชื่อไม่ตรง แสดงรายชื่อโมเดลที่มี) · **OFFLINE** (Ollama ไม่ได้รัน) |
-| Local | GPU (NVIDIA) | `nvidia-smi` ทุก 1 วินาที: อุณหภูมิ, VRAM, Utilization, Power, Fan + โมเดลไหนโหลดอยู่ใน VRAM |
+| Local | GPU (NVIDIA) | `nvidia-smi` ทุก 1 วินาที: อุณหภูมิ, VRAM, Utilization, Power, Fan + โมเดลไหนโหลดอยู่ใน VRAM + **CPU %, RAM และ CPU/RAM ที่ Ollama ใช้** + อุณหภูมิ CPU (ถ้าเปิด LibreHardwareMonitor) |
 
 **Realtime สำหรับ Local:** หน้าจอดึงข้อมูลทุก 1 วินาที (`ui_refresh_ms`), GPU เช็คทุก 1 วินาที, Ollama ทุก 2 วินาที เมื่อโมเดลโหลดอยู่และ GPU util ≥ 30% การ์ดจะเป็น **GENERATING** (ม่วง กะพริบ) พร้อม `LIVE · GPU % · W · °C` — Ollama ไม่มี API บอกว่ากำลังตอบอยู่ จึงอนุมานจากโหลด GPU (ถ้ามีหลายโมเดลโหลดพร้อมกัน จะขึ้นทุกตัวที่โหลดอยู่)
 
@@ -87,6 +87,16 @@ MiMo ไม่มี API บอกโควตา แถบ **Credits (ประ
 ถ้าไปขึ้นผิดจอ ดูตำแหน่งจอใน **Settings → System → Display** (ถ้าวาง Xeneon Edge ไว้ใต้จอหลัก ปกติจะเป็น `0` กับความสูงของจอหลัก เช่น `1440`) แล้วแก้ 2 บรรทัดนี้ใน `run.bat`
 
 เปิดอัตโนมัติตอนเปิดเครื่องแบบทำเอง: กด `Win+R` → `shell:startup` → สร้าง shortcut ไปที่ `run.bat`
+
+### อุณหภูมิ CPU (ไม่บังคับ)
+
+Windows ไม่มีวิธีมาตรฐานให้โปรแกรมทั่วไปอ่านอุณหภูมิ CPU (PredatorSense อ่านผ่านช่องทางเฉพาะของ Acer) จึงใช้ [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) (ฟรี, โอเพนซอร์ส):
+
+1. ดาวน์โหลด แตกไฟล์ แล้วเปิด `LibreHardwareMonitor.exe` แบบ **Run as administrator** (ต้องใช้สิทธิ์นี้เพื่ออ่าน sensor)
+2. เมนู **Options → Remote Web Server → Run** (พอร์ตเริ่มต้น 8085) และเปิด **Options → Start Minimized / Run On Windows Startup** ถ้าต้องการ
+3. ใน `config.yaml` ส่วน `gpu` เพิ่ม `cpu_temp_url: http://127.0.0.1:8085/data.json`
+
+การ์ด GPU จะแสดง `CPU · 96°C` (เขียว < 85, เหลือง 85–94, แดง ≥ 95) ถ้าไม่ได้ตั้ง ก็แสดง CPU % / RAM ตามปกติ
 
 ## AI-Monitor.exe
 

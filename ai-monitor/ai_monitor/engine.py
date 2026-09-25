@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 # Local services must never go through a system/VPN proxy (httpx picks those up from Windows settings).
-LOCAL_TYPES = {"ollama"}
+LOCAL_TYPES = {"ollama", "gpu"}  # gpu may call LibreHardwareMonitor on localhost
 
 
 def _error_result(p: Provider, exc: Exception) -> CheckResult:
