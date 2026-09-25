@@ -224,9 +224,9 @@ function hermesInner(p) {
     <div class="tiles">
       ${tile("GATEWAY", x.pid ? duration(x.uptime_s) : "OFF", x.pid ? `PID ${x.pid}` : "ไม่ได้รัน")}
       ${tile("MODEL", x.model || "-", x.provider || "")}
-      ${tile("AGENTS", x.active_agents ?? "-", "กำลังทำงาน")}
-      ${tile("SESSIONS", s ? s.today : "-", "วันนี้")}
-      ${tile("TOKENS", s ? num(s.tokens_today) : "-", s && s.last_at ? `ล่าสุด ${ago(s.last_at)}${s.last_source ? " · " + s.last_source : ""}` : "")}
+      ${tile("AGENTS", s ? s.active : x.active_agents ?? "-", `กำลังทำงาน${x.active_agents ? ` · gateway ${x.active_agents}` : ""}`)}
+      ${tile("SESSIONS", s ? s.today : "-", s && s.profiles && s.profiles.length ? `วันนี้ · ${s.profiles.join(", ")}` : "วันนี้")}
+      ${tile("TOKENS", s ? num(s.tokens_today) : "-", s && s.last_at ? `ล่าสุด ${ago(s.last_at)}${s.last_profile ? " · " + s.last_profile : ""}${s.last_source ? " · " + s.last_source : ""}` : "")}
       ${tile("CRON", c ? `${c.enabled}/${c.total}` : "-", c && c.next_at ? `ถัดไป ${clock(c.next_at)} ${c.next_name || ""}` : c && c.failed ? `ล้ม ${c.failed}` : "")}
     </div>
     <div class="console ${errors.length ? "" : "none"}">${errors.length

@@ -619,3 +619,27 @@ def test_free_tier_daily_usage_and_429_count(tmp_path):
     store.add_check("glm", "degraded", 1, "โดน rate limit (HTTP 429: busy)", {})
     store.add_check("glm", "up", 1, "API ใช้ได้", {})
     assert store.count_detail("glm", 0, "%HTTP 429%") == 1
+
+
+def test_hermes_sessions_include_profiles_and_running(tmp_path):
+    home = tmp_path / "hermes"
+    (home / "profiles" / "mimo").mkdir(parents=True)
+    now = time.time()
+
+    def make(db, rows):
+        c = sqlite3.connect(db)
+        c.execute("CREATE TABLE sessions (id TEXT, source TEXT, model TEXT, started_at REAL, ended_at REAL,"
+                  " last_activity_at REAL, input_tokens INT, output_tokens INT, cache_read_tokens INT, cache_write_tokens INT)")
+        c.executemany("INSERT INTO sessions VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
+        c.commit()
+        c.close()
+
+    make(home / "state.db", [("a", "oneshot", "spark", now - 86400 * 2, now - 86400 * 2, None, 5, 5, 0, 0)])
+    make(home / "profiles" / "mimo" / "state.db", [
+        ("b", "cli", "mimo-v2.6-pro", now - 600, None, now - 30, 100, 20, 1000, 0),   # running today
+        ("c", "cli", "mimo-v2.6-pro", now - 3600, now - 3000, now - 3000, 10, 10, 0, 0),  # finished today
+        ("d", "cli", "mimo-v2.6-pro", now - 7200, None, now - 7000, 1, 1, 0, 0)])        # stale, not running
+    s = hermes._sessions(home, now)
+    assert (s["today"], s["tokens_today"], s["active"]) == (3, 1120 + 20 + 2, 1)
+    assert (s["last_profile"], s["last_model"], s["last_source"]) == ("mimo", "mimo-v2.6-pro", "cli")
+    assert s["profiles"] == ["mimo"]

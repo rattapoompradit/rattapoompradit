@@ -73,24 +73,65 @@ def _model(home: Path) -> dict[str, Any]:
     return {"model": model} if isinstance(model, str) else {}
 
 
-def _sessions(db: Path) -> dict[str, Any] | None:
-    if not db.is_file():
-        return None
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+ACTIVE_WINDOW_S = 300  # a session with activity in the last 5 minutes and no end counts as running
+
+
+def _session_dbs(home: Path) -> list[tuple[str | None, Path]]:
+    """(profile name or None for the main home, state.db) for the main Hermes home and every profile."""
+    dbs = [(None, home / "state.db")]
+    dbs += [(db.parent.name, db) for db in sorted((home / "profiles").glob("*/state.db"))]
+    return [(name, db) for name, db in dbs if db.is_file()]
+
+
+def _query_sessions(db: Path, today: float, now: float) -> dict[str, Any] | None:
+    conn = sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True, timeout=2)
     try:
-        conn = sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True, timeout=2)
-        try:
+        try:  # newer schema also has cache token columns
+            count, tokens = conn.execute(
+                "SELECT COUNT(*), COALESCE(SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens), 0)"
+                " FROM sessions WHERE started_at >= ?", (today,)).fetchone()
+        except sqlite3.OperationalError:
             count, tokens = conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0)"
                 " FROM sessions WHERE started_at >= ?", (today,)).fetchone()
-            last = conn.execute(
-                "SELECT started_at, source FROM sessions ORDER BY started_at DESC LIMIT 1").fetchone()
-        finally:
-            conn.close()
-    except sqlite3.Error:
-        return None
-    return {"today": count, "tokens_today": tokens,
-            "last_at": last[0] if last else None, "last_source": last[1] if last else None}
+        try:  # running = not ended and active recently (Hermes heartbeats last_activity_at)
+            (active,) = conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE ended_at IS NULL"
+                " AND COALESCE(last_activity_at, started_at) >= ?", (now - ACTIVE_WINDOW_S,)).fetchone()
+        except sqlite3.OperationalError:
+            active = 0
+        try:
+            last = conn.execute("SELECT started_at, source, model FROM sessions ORDER BY started_at DESC LIMIT 1").fetchone()
+        except sqlite3.OperationalError:  # older schema without model
+            last = conn.execute("SELECT started_at, source, NULL FROM sessions ORDER BY started_at DESC LIMIT 1").fetchone()
+    finally:
+        conn.close()
+    return {"today": count, "tokens_today": tokens, "active": active, "last": last}
+
+
+def _sessions(home: Path, now: float | None = None) -> dict[str, Any] | None:
+    """Today's sessions / tokens and running sessions, summed over the main home and all profiles
+    (each Hermes profile keeps its own state.db)."""
+    now = now or time.time()
+    today = datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    total = {"today": 0, "tokens_today": 0, "active": 0, "last_at": None, "last_source": None,
+             "last_model": None, "last_profile": None, "profiles": []}
+    found = False
+    for profile, db in _session_dbs(home):
+        try:
+            r = _query_sessions(db, today, now)
+        except sqlite3.Error:
+            continue
+        found = True
+        total["today"] += r["today"]
+        total["tokens_today"] += r["tokens_today"]
+        total["active"] += r["active"]
+        if r["today"] or r["active"]:
+            total["profiles"].append(profile or "main")
+        last = r["last"]
+        if last and (total["last_at"] is None or last[0] > total["last_at"]):
+            total.update(last_at=last[0], last_source=last[1], last_model=last[2], last_profile=profile)
+    return total if found else None
 
 
 def _cron(path: Path) -> dict[str, Any] | None:
@@ -146,7 +187,7 @@ def read_status(home: Path, gateway_required: bool = True) -> CheckResult:
         "version": state.get("code_version"),
         "platforms": platforms,
         **_model(home),
-        "sessions": _sessions(home / "state.db"),
+        "sessions": _sessions(home),
         "cron": _cron(home / "cron" / "jobs.json"),
         "errors": _tail(home / "logs" / "errors.log"),
     }
