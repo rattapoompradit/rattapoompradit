@@ -206,6 +206,13 @@ function tile(label, value, small = "") {
   return `<div class="tile"><em>${label}</em><b title="${esc(value)}">${esc(value)}</b>${small ? `<small title="${esc(small)}">${esc(small)}</small>` : ""}</div>`;
 }
 
+function kanbanRow(k) {
+  const pill = (cls, label, n) => `<span class="kb ${cls}${n ? "" : " zero"}"><b>${n}</b>${label}</span>`;
+  return `<div class="kanban" title="${k.boards} board">
+    <em>KANBAN</em>${pill("kb-run", "RUNNING", k.running)}${pill("kb-queue", "QUEUE", k.queued)}
+    ${pill("kb-block", "BLOCKED", k.blocked)}${pill("kb-review", "REVIEW", k.review)}${pill("kb-done", "DONE วันนี้", k.done_today)}</div>`;
+}
+
 function hermesInner(p) {
   const x = p.extra || {}, s = x.sessions, c = x.cron;
   const platforms = Object.entries(x.platforms || {}).map(([name, v]) =>
@@ -221,10 +228,11 @@ function hermesInner(p) {
     </div>
     <div class="detail" title="${esc(p.detail)}">${esc(p.detail)}</div>
     ${platforms ? `<div class="chips">${platforms}</div>` : ""}
+    ${x.kanban ? kanbanRow(x.kanban) : ""}
     <div class="tiles">
       ${tile("GATEWAY", x.pid ? duration(x.uptime_s) : "OFF", x.pid ? `PID ${x.pid}` : "ไม่ได้รัน")}
       ${tile("MODEL", x.model || "-", x.provider || "")}
-      ${tile("AGENTS", s ? s.active : x.active_agents ?? "-", `กำลังทำงาน${x.active_agents ? ` · gateway ${x.active_agents}` : ""}`)}
+      ${tile("AGENTS", s && s.active != null ? s.active : x.active_agents ?? "-", `กำลังทำงาน${x.active_agents ? ` · gateway ${x.active_agents}` : ""}`)}
       ${tile("SESSIONS", s ? s.today : "-", s && s.profiles && s.profiles.length ? `วันนี้ · ${s.profiles.join(", ")}` : "วันนี้")}
       ${tile("TOKENS", s ? num(s.tokens_today) : "-", s && s.last_at ? `ล่าสุด ${ago(s.last_at)}${s.last_profile ? " · " + s.last_profile : ""}${s.last_source ? " · " + s.last_source : ""}` : "")}
       ${tile("CRON", c ? `${c.enabled}/${c.total}` : "-", c && c.next_at ? `ถัดไป ${clock(c.next_at)} ${c.next_name || ""}` : c && c.failed ? `ล้ม ${c.failed}` : "")}

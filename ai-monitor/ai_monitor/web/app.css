@@ -171,6 +171,17 @@ body > * { position: relative; z-index: 1; }
 .modal-card .usage-note { white-space: normal; }
 .usage-error { margin-top: auto; color: var(--degraded); font-size: 1.8vh; }
 
+/* ---------- Hermes Kanban row ---------- */
+.kanban { display: flex; align-items: center; gap: 0.8vh; flex-wrap: wrap; }
+.kanban em { font-style: normal; font-family: var(--head); font-size: 1.2vh; letter-spacing: 0.22em; color: var(--muted); margin-right: 0.4vh; }
+.kb { --k: var(--muted); display: inline-flex; align-items: baseline; gap: 0.5vh; font-family: var(--head); font-size: 1.2vh; letter-spacing: 0.12em;
+  color: var(--k); padding: 0.3vh 1vh; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--k) 40%, transparent);
+  background: color-mix(in srgb, var(--k) 8%, transparent); }
+.kb b { font-size: 1.9vh; }
+.kb.zero { opacity: 0.4; }
+.kb-run { --k: var(--up); } .kb-queue { --k: var(--cyan); } .kb-block { --k: var(--degraded); } .kb-review { --k: var(--violet); } .kb-done { --k: var(--text); }
+.kb-run:not(.zero) b { animation: blink 1.4s ease-in-out infinite; }
+
 /* ---------- Hermes Router status bar ---------- */
 .router-bar {
   --c: var(--unknown);
@@ -323,6 +334,7 @@ html.night body { filter: brightness(0.55) saturate(0.85); }
   .name, .hermes .name { font-size: 19px; } .code { font-size: 24px; } .core { width: 64px; height: 64px; } .core span { font-size: 22px; }
   .detail, .sub, .th, .stat, .bar-head, .chip, .tile small, .console, .tk, .pill span, .timebox small, .usage-error, .gpu-name, .stale-badge, .modal-side dl, .split-head, .unload, .idle-note { font-size: 13px; }
   .foot { font-size: 11px; } .split-track { height: 10px; }
+  .kanban em, .kb { font-size: 9px; } .kb b { font-size: 13px; }
   .rk, .rstat { font-size: 10px; } .rv, .route { font-size: 15px; } .reason, .rrow small { font-size: 13px; } .router-bar { padding: 10px 14px; }
   .speed b { font-size: 26px; } .speed small, .bench-note { font-size: 12px; } .speed span { font-size: 10px; } .bench { font-size: 15px; padding: 10px 14px; }
   .ticker { order: 5; flex-basis: 100%; height: 26px; }

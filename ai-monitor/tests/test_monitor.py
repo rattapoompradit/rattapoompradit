@@ -643,3 +643,23 @@ def test_hermes_sessions_include_profiles_and_running(tmp_path):
     assert (s["today"], s["tokens_today"], s["active"]) == (3, 1120 + 20 + 2, 1)
     assert (s["last_profile"], s["last_model"], s["last_source"]) == ("mimo", "mimo-v2.6-pro", "cli")
     assert s["profiles"] == ["mimo"]
+
+
+def test_hermes_kanban_counts(tmp_path, monkeypatch):
+    monkeypatch.delenv("HERMES_KANBAN_HOME", raising=False)
+    home = tmp_path / "hermes"
+    (home / "kanban" / "boards" / "work").mkdir(parents=True)
+    now = time.time()
+
+    def make(db, rows):
+        c = sqlite3.connect(db)
+        c.execute("CREATE TABLE tasks (id TEXT, status TEXT, completed_at INTEGER)")
+        c.executemany("INSERT INTO tasks VALUES (?,?,?)", rows)
+        c.commit()
+        c.close()
+
+    make(home / "kanban.db", [("1", "running", None), ("2", "ready", None), ("3", "todo", None),
+                              ("4", "done", int(now) - 60), ("5", "done", int(now) - 86400 * 3)])
+    make(home / "kanban" / "boards" / "work" / "kanban.db", [("6", "blocked", None), ("7", "review", None)])
+    assert hermes._kanban(home, now) == {"boards": 2, "running": 1, "queued": 2, "blocked": 1, "review": 1, "done_today": 1}
+    assert hermes._kanban(tmp_path / "empty", now) is None

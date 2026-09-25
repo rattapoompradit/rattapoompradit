@@ -134,6 +134,38 @@ def _sessions(home: Path, now: float | None = None) -> dict[str, Any] | None:
     return total if found else None
 
 
+QUEUED = ("triage", "todo", "scheduled", "ready")
+
+
+def _kanban(home: Path, now: float | None = None) -> dict[str, Any] | None:
+    """Task counts by status over every Kanban board: <root>/kanban.db (default board) and
+    <root>/kanban/boards/*/kanban.db (HERMES_KANBAN_HOME overrides the root, as in Hermes)."""
+    root = Path(os.environ["HERMES_KANBAN_HOME"]).expanduser() if os.environ.get("HERMES_KANBAN_HOME") else home
+    dbs = [root / "kanban.db", *sorted((root / "kanban" / "boards").glob("*/kanban.db"))]
+    now = now or time.time()
+    today = datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    counts: dict[str, int] = {}
+    done_today, boards = 0, 0
+    for db in (d for d in dbs if d.is_file()):
+        try:
+            conn = sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True, timeout=2)
+            try:
+                for status, n in conn.execute("SELECT status, COUNT(*) FROM tasks GROUP BY status"):
+                    counts[status] = counts.get(status, 0) + n
+                (d,) = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'done' AND completed_at >= ?",
+                                    (today,)).fetchone()
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            continue
+        boards += 1
+        done_today += d
+    if not boards:
+        return None
+    return {"boards": boards, "running": counts.get("running", 0), "queued": sum(counts.get(s, 0) for s in QUEUED),
+            "blocked": counts.get("blocked", 0), "review": counts.get("review", 0), "done_today": done_today}
+
+
 def _cron(path: Path) -> dict[str, Any] | None:
     data = _read_json(path)
     jobs = data.get("jobs") if isinstance(data, dict) else data
@@ -189,6 +221,7 @@ def read_status(home: Path, gateway_required: bool = True) -> CheckResult:
         **_model(home),
         "sessions": _sessions(home),
         "cron": _cron(home / "cron" / "jobs.json"),
+        "kanban": _kanban(home),
         "errors": _tail(home / "logs" / "errors.log"),
     }
 

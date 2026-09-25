@@ -10,8 +10,10 @@ SAMPLES = {
         "pid": 18244, "uptime_s": 3 * 86400 + 4 * 3600, "active_agents": 1, "version": "0.9.2",
         "model": "qwen3.5:14b", "provider": "custom",
         "platforms": {"telegram": {"state": "connected"}, "discord": {"state": "retrying", "error": "rate limited"}},
-        "sessions": {"today": 18, "tokens_today": 412_380, "last_at": time.time() - 540, "last_source": "telegram"},
+        "sessions": {"today": 18, "tokens_today": 412_380, "active": 2, "profiles": ["main", "mimo"], "last_at": time.time() - 540,
+                     "last_source": "cli", "last_profile": "mimo", "last_model": "mimo-v2.6-pro"},
         "cron": {"total": 4, "enabled": 3, "failed": 0, "next_at": time.time() + 1500, "next_name": "morning-brief"},
+        "kanban": {"boards": 1, "running": 1, "queued": 3, "blocked": 0, "review": 1, "done_today": 5},
         "errors": ["2026-09-24 09:12:44 WARNING gateway.discord: 429 Too Many Requests, retry in 30s"],
     }),
     "chatgpt": ("up", "ChatGPT: operational", 180, {"usage": {"plan": "plus", "bars": [
