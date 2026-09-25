@@ -8,10 +8,23 @@ const LOCAL = {
   ready: { code: "READY", label: "พร้อมใช้" },
   missing: { code: "MISSING", label: "ไม่พบโมเดล" },
   starting: { code: "STARTING", label: "กำลังเปิด Ollama" },
+  generating: { code: "GENERATING", label: "กำลังสร้างคำตอบ" },
 };
-const localState = (p) => (p.type === "ollama" && p.status !== "down" && p.extra ? LOCAL[p.extra.state] : null);
+// Ollama has no "busy" API, so a loaded model on a GPU working hard is shown as generating (like the fan spinning up).
+const GEN_UTIL_PCT = 30;
+function gpuNow() {
+  const g = ((last.providers || []).find((q) => q.type === "gpu") || {}).extra;
+  return g && g.gpus && g.gpus[0] ? g.gpus[0] : null;
+}
+const isGenerating = (p) => {
+  const g = gpuNow();
+  return p.type === "ollama" && p.status !== "down" && p.extra && p.extra.state === "active" && g && g.util >= GEN_UTIL_PCT;
+};
+const localState = (p) => (isGenerating(p) ? LOCAL.generating
+  : p.type === "ollama" && p.status !== "down" && p.extra ? LOCAL[p.extra.state] : null);
 const codeFor = (p) => (localState(p) || { code: CODE[p.status] }).code;
-const statusClass = (p) => (p.type === "ollama" && p.status === "up" && p.extra && p.extra.state === "ready" ? "s-ready" : `s-${p.status}`);
+const statusClass = (p) => (isGenerating(p) ? "s-gen"
+  : p.type === "ollama" && p.status === "up" && p.extra && p.extra.state === "ready" ? "s-ready" : `s-${p.status}`);
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (n) => (n ?? 0).toLocaleString("en-US");
@@ -112,16 +125,18 @@ function localInner(p) {
   const spec = [x.params, x.quant].filter(Boolean).join(" · ");
   const api = p.latency_ms != null ? stat("API", num(p.latency_ms), "ms") : "";
   let body;
+  const g = isGenerating(p) ? gpuNow() : null;
+  const live = g ? `<div class="live"><i></i>LIVE · GPU <b>${Math.round(g.util)}%</b>${g.power_w != null ? ` · <b>${Math.round(g.power_w)}</b> W` : ""}${g.temp != null ? ` · <b>${Math.round(g.temp)}</b>°C` : ""}</div>` : "";
   if (x.state === "active" && p.status !== "down") {
     const gpu = x.gpu_pct ?? 100;
-    body = `<div class="split">
+    body = `${live}<div class="split">
         <div class="split-head"><span>GPU <b>${gpu}%</b></span>${gpu < 100
           ? `<span class="warn">CPU <b>${100 - gpu}%</b> · ช้าลง</span>` : `<span>VRAM <b>${x.vram_gb} GB</b></span>`}</div>
         <div class="split-track"><div class="split-gpu" style="width:${gpu}%"></div><div class="split-cpu" style="width:${100 - gpu}%"></div></div>
       </div>
       ${speedBlock(x.speed)}
       <div class="stats">${x.context ? stat("CTX", num(x.context)) : ""}${api}</div>
-      ${x.expires_at ? `<div class="unload" data-exp="${x.expires_at}">${unloadText(x.expires_at)}</div>` : ""}`;
+      ${x.expires_at ? `<div class="unload" data-exp="${x.expires_at}"></div>` : ""}`;
   } else if (x.state === "ready" && p.status !== "down") {
     body = `${speedBlock(x.speed)}<div class="stats">${x.disk_gb ? stat("SIZE", x.disk_gb, "GB") : ""}${api}${p.uptime_24h != null ? stat("UP 24H", `${p.uptime_24h}%`) : ""}</div>
       <div class="idle-note">◇ ไม่ได้ใช้ VRAM ตอนนี้ · โหลดเองเมื่อมีการเรียกใช้</div>`;
@@ -389,6 +404,32 @@ async function refreshRouter() {
 
 let last = { providers: [], events: [] };
 
+// Only touch the DOM when a card's markup changed, so pulses/transitions are not restarted on every poll.
+function setHtml(el, html) {
+  if (el._html !== html) {
+    el.innerHTML = html;
+    el._html = html;
+  }
+}
+
+function patchCards(container, items) {
+  const byId = new Map([...container.children].map((el) => [el.dataset.id, el]));
+  items.forEach(([id, html], i) => {
+    let el = byId.get(id);
+    if (!el || el._html !== html) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html.trim();
+      const fresh = tmp.firstElementChild;
+      fresh._html = html;
+      if (el) el.replaceWith(fresh);
+      el = fresh;
+    }
+    if (container.children[i] !== el) container.insertBefore(el, container.children[i] || null);
+  });
+  const keep = new Set(items.map(([id]) => id));
+  [...container.children].forEach((el) => keep.has(el.dataset.id) || el.remove());
+}
+
 function render(data, stale = false) {
   const providers = data.providers;
   const hermes = providers.find((p) => p.type === "hermes");
@@ -398,21 +439,26 @@ function render(data, stale = false) {
     const st = isStale(hermes);
     hermesEl.className = `card hermes s-${hermes.status}${st ? " stale" : ""}`;
     hermesEl.dataset.id = hermes.id;
-    hermesEl.innerHTML = hermesInner(hermes) + (st ? `<span class="stale-badge">ข้อมูลเก่า ${ago(hermes.checked_at)}</span>` : "");
+    setHtml(hermesEl, hermesInner(hermes) + (st ? `<span class="stale-badge">ข้อมูลเก่า ${ago(hermes.checked_at)}</span>` : ""));
   }
-  document.getElementById("grid").innerHTML = providers.filter((p) => p !== hermes).map((p) => card(p, providers)).join("");
-  document.getElementById("summary").innerHTML = summary(providers);
+  patchCards(document.getElementById("grid"), providers.filter((p) => p !== hermes).map((p) => [p.id, card(p, providers)]));
+  setHtml(document.getElementById("summary"), summary(providers));
   renderTicker(data.events || []);
+  updateCountdowns();
   const link = document.getElementById("link");
   link.className = stale ? "link lost" : "link";
   link.textContent = stale ? "● LINK LOST" : data.generated_at ? `● SYNC ${clock(data.generated_at)}` : "";
+}
+
+function updateCountdowns() {
+  document.querySelectorAll(".unload[data-exp]").forEach((el) => { el.innerHTML = unloadText(+el.dataset.exp); });
 }
 
 function tick() {
   const now = new Date();
   document.getElementById("clock").textContent = now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   document.getElementById("date").textContent = now.toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short" });
-  document.querySelectorAll(".unload[data-exp]").forEach((el) => { el.innerHTML = unloadText(+el.dataset.exp); });
+  updateCountdowns();
   const h = now.getHours();
   document.documentElement.classList.toggle("night", h >= 23 || h < 7); // dim the always-on screen at night
 }

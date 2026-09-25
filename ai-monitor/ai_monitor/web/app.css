@@ -256,6 +256,11 @@ body > * { position: relative; z-index: 1; }
 
 /* ---------- Local model card ---------- */
 .s-ready { --c: var(--cyan); }
+.s-gen { --c: var(--violet); animation: gen 1.6s ease-in-out infinite; }
+@keyframes gen { 50% { box-shadow: 0 0 2.6vh color-mix(in srgb, var(--violet) 45%, transparent), inset 0 0 3vh color-mix(in srgb, var(--violet) 14%, transparent); } }
+.live { display: flex; align-items: center; gap: 0.8vh; font-family: var(--head); font-size: 1.4vh; letter-spacing: 0.12em; color: var(--violet); }
+.live b { color: var(--text); font-size: 1.8vh; }
+.live i { width: 1vh; height: 1vh; border-radius: 50%; background: var(--violet); box-shadow: 0 0 1vh var(--violet); animation: blink 0.8s steps(2) infinite; }
 .split-head { display: flex; justify-content: space-between; gap: 1vh; font-size: 1.9vh; color: var(--muted); white-space: nowrap; }
 .split-head b { font-family: var(--head); color: var(--text); }
 .split-head .warn b { color: var(--degraded); }
@@ -334,6 +339,7 @@ html.night body { filter: brightness(0.55) saturate(0.85); }
   .name, .hermes .name { font-size: 19px; } .code { font-size: 24px; } .core { width: 64px; height: 64px; } .core span { font-size: 22px; }
   .detail, .sub, .th, .stat, .bar-head, .chip, .tile small, .console, .tk, .pill span, .timebox small, .usage-error, .gpu-name, .stale-badge, .modal-side dl, .split-head, .unload, .idle-note { font-size: 13px; }
   .foot { font-size: 11px; } .split-track { height: 10px; }
+  .live { font-size: 10px; } .live b { font-size: 13px; }
   .kanban em, .kb { font-size: 9px; } .kb b { font-size: 13px; }
   .rk, .rstat { font-size: 10px; } .rv, .route { font-size: 15px; } .reason, .rrow small { font-size: 13px; } .router-bar { padding: 10px 14px; }
   .speed b { font-size: 26px; } .speed small, .bench-note { font-size: 12px; } .speed span { font-size: 10px; } .bench { font-size: 15px; padding: 10px 14px; }

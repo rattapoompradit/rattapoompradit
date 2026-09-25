@@ -9,7 +9,7 @@ defaults:
   timeout_s: 15
   degraded_latency_ms: 5000 # ช้ากว่านี้ = สีเหลือง
   fail_threshold: 2         # ล้มกี่ครั้งติดกันถึงขึ้นสีแดง
-  ui_refresh_ms: 3000       # หน้าจอดึงข้อมูลใหม่ทุกกี่ ms (1000-60000) — แก้แล้วรีสตาร์ท ไม่ต้อง build ใหม่
+  ui_refresh_ms: 1000       # หน้าจอดึงข้อมูลใหม่ทุกกี่ ms (1000-60000) — แก้แล้วรีสตาร์ท ไม่ต้อง build ใหม่
 
 # Hermes Router: แสดงผลการตัดสินใจล่าสุด (อ่านอย่างเดียว ไม่แก้ logic การ route)
 # ไม่ตั้งค่า = หาไฟล์ router*.json / router*.jsonl ใน Hermes home ให้เอง ถ้าไม่เจอจะแสดง ROUTER: N/A
@@ -109,6 +109,7 @@ providers:
     name: Sparkx 2.5
     group: Local
     type: ollama
+    interval_s: 2
     base_url: auto            # auto = ใช้ OLLAMA_HOST ถ้าตั้งไว้ ไม่งั้น http://127.0.0.1:11434
     auto_start: true          # Ollama ไม่ได้รัน -> เปิด `ollama serve` ให้เองแบบซ่อนหน้าต่าง
     model_hint: spark         # แก้ให้ตรงกับชื่อใน `ollama list`
@@ -118,6 +119,7 @@ providers:
     name: Qwen 3.5
     group: Local
     type: ollama
+    interval_s: 2
     base_url: auto
     auto_start: true
     model_hint: qwen3.5
@@ -126,7 +128,7 @@ providers:
     name: GPU
     group: Local
     type: gpu
-    interval_s: 10
+    interval_s: 1             # ใช้ดูว่าโมเดล Local กำลังสร้างคำตอบ (GENERATING) แบบ realtime
     temp_warn_c: 80           # เหลือง
     temp_crit_c: 90           # แดง
     vram_warn_pct: 95
