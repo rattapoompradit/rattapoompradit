@@ -115,7 +115,7 @@ def _sessions(home: Path, now: float | None = None) -> dict[str, Any] | None:
     now = now or time.time()
     today = datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     total = {"today": 0, "tokens_today": 0, "active": 0, "last_at": None, "last_source": None,
-             "last_model": None, "last_profile": None, "profiles": []}
+             "last_model": None, "last_profile": None, "profiles": [], "active_names": []}
     found = False
     for profile, db in _session_dbs(home):
         try:
@@ -126,6 +126,8 @@ def _sessions(home: Path, now: float | None = None) -> dict[str, Any] | None:
         total["today"] += r["today"]
         total["tokens_today"] += r["tokens_today"]
         total["active"] += r["active"]
+        if r["active"]:
+            total["active_names"].append(profile or "main")
         if r["today"] or r["active"]:
             total["profiles"].append(profile or "main")
         last = r["last"]

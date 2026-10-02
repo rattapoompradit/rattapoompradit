@@ -644,7 +644,7 @@ def test_hermes_sessions_include_profiles_and_running(tmp_path):
     s = hermes._sessions(home, now)
     assert (s["today"], s["tokens_today"], s["active"]) == (3, 1120 + 20 + 2, 1)
     assert (s["last_profile"], s["last_model"], s["last_source"]) == ("mimo", "mimo-v2.6-pro", "cli")
-    assert s["profiles"] == ["mimo"]
+    assert s["profiles"] == ["mimo"] and s["active_names"] == ["mimo"]
 
 
 def test_hermes_kanban_counts(tmp_path, monkeypatch):
