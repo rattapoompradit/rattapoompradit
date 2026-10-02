@@ -379,6 +379,20 @@ document.addEventListener("keydown", (ev) => ev.key === "Escape" && closeModal()
 const ROUTER_REFRESH_MS = 3000;
 const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
+function agoText(at) {
+  return at ? ago(at) + (Date.now() / 1000 - at < 60 ? "" : "ที่แล้ว") : "";
+}
+
+// Latest state of every agent, so one agent chatting all day does not hide the others.
+function agentsRow(agents) {
+  if (!agents || agents.length < 2) return "";
+  return `<div class="rrow ragents"><span class="rk">AGENTS</span>${agents.map((a) => {
+    const st = a.status || "N/A";
+    const tip = [a.route, a.model, st, a.reason, agoText(a.at)].filter(Boolean).join(" · ");
+    return `<span class="ra rs-${slug(st)}" title="${esc(tip)}"><i></i>${esc(a.agent || a.model || "?")}</span>`;
+  }).join("")}</div>`;
+}
+
 function renderRouter(r) {
   const el = document.getElementById("router");
   if (!r || !r.available) {
@@ -391,13 +405,14 @@ function renderRouter(r) {
   el.className = `router-bar rs-${slug(status)}`;
   el.innerHTML = `<div class="rrow">
       <span class="rk">ROUTER</span><b class="route rt-${slug(r.route)}">${esc(r.route || "N/A")}</b>
+      ${r.agent ? `<span class="rk">AGENT</span><b class="rv ragent" title="${esc(r.agent)}">${esc(r.agent)}</b>` : ""}
       <span class="rk">MODEL</span><b class="rv" title="${esc(r.model || "N/A")}">${esc(r.model || "N/A")}</b>
       <span class="rstat"><i></i>${esc(status)}</span>
     </div>
     <div class="rrow">
       <span class="rk">REASON</span><span class="reason" title="${esc(r.reason || "")}">${esc(r.reason || "N/A")}</span>
-      <small title="${esc(r.source || "")}">${r.at ? ago(r.at) + (Date.now() / 1000 - r.at < 60 ? "" : "ที่แล้ว") : ""}</small>
-    </div>`;
+      <small title="${esc(r.source || "")}">${agoText(r.at)}</small>
+    </div>${agentsRow(r.agents)}`;
 }
 
 let routerLast = null;

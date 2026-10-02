@@ -73,7 +73,7 @@ def _model(home: Path) -> dict[str, Any]:
     return {"model": model} if isinstance(model, str) else {}
 
 
-ACTIVE_WINDOW_S = 300  # a session with activity in the last 5 minutes and no end counts as running
+ACTIVE_WINDOW_S = 300  # a session with activity in the last 5 minutes and no end counts as running (or one holding a turn lease)
 
 
 def _session_dbs(home: Path) -> list[tuple[str | None, Path]]:
@@ -81,6 +81,15 @@ def _session_dbs(home: Path) -> list[tuple[str | None, Path]]:
     dbs = [(None, home / "state.db")]
     dbs += [(db.parent.name, db) for db in sorted((home / "profiles").glob("*/state.db"))]
     return [(name, db) for name, db in dbs if db.is_file()]
+
+
+def _epoch(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return value / 1000 if value > 1e12 else float(value)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
 
 
 def _query_sessions(db: Path, today: float, now: float) -> dict[str, Any] | None:
@@ -100,6 +109,11 @@ def _query_sessions(db: Path, today: float, now: float) -> dict[str, Any] | None
                 " AND COALESCE(last_activity_at, started_at) >= ?", (now - ACTIVE_WINDOW_S,)).fetchone()
         except sqlite3.OperationalError:
             active = 0
+        try:  # a turn in progress holds a lease, even when a long tool call keeps the session quiet for minutes
+            leases = conn.execute("SELECT conversation_id, expires_at FROM session_turn_leases").fetchall()
+            active = max(active, len({conv for conv, expires in leases if (_epoch(expires) or 0) > now}))
+        except sqlite3.OperationalError:  # older Hermes without leases
+            pass
         try:
             last = conn.execute("SELECT started_at, source, model FROM sessions ORDER BY started_at DESC LIMIT 1").fetchone()
         except sqlite3.OperationalError:  # older schema without model

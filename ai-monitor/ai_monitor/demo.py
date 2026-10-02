@@ -73,5 +73,11 @@ def seed(monitor: Monitor) -> None:
 
 def router_sample() -> dict:
     """Sample Hermes Router decision for demo mode (real mode reads it from the router's own output)."""
-    return {"available": True, "route": "DIRECT", "model": "sparkx-2.5:8b", "reason": "Simple task",
-            "status": "RUNNING", "at": time.time() - 12, "source": "demo", "read_at": time.time()}
+    now = time.time()
+    agents = [
+        {"route": "DIRECT", "agent": "mimo", "model": "mimo-v2.6-pro", "reason": "direct conversation", "status": "RUNNING", "at": now - 12},
+        {"route": "KANBAN", "agent": "sol", "model": "gpt-6-sol", "reason": "kanban task", "status": "RUNNING", "at": now - 95},
+        {"route": "CODE", "agent": "sonnet", "model": "claude-sonnet-5", "reason": "code review", "status": "IDLE", "at": now - 640},
+        {"route": "DIRECT", "agent": "qwen", "model": "qwen3.5:9b", "reason": "session end", "status": "IDLE", "at": now - 2400},
+    ]
+    return {"available": True, **agents[0], "source": "demo", "read_at": now, "agents": agents}

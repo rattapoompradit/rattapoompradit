@@ -441,6 +441,19 @@ def test_router_status_sources(tmp_path):
     assert (r["route"], r["model"], r["reason"], r["status"]) == ("KANBAN", "nemotron", "Board update", "ROUTING")
     assert read_router({"log": str(t)}, None)["available"] is False  # pattern required
 
+    # per-agent latest state: one agent chatting does not hide the others
+    a = tmp_path / "router-decisions.jsonl"
+    a.write_text("\n".join(json.dumps(x) for x in [
+        {"route": "KANBAN", "agent": "sol", "model": "gpt-6-sol", "status": "running", "ts": 100},
+        {"route": "DIRECT", "profile": "mimo", "model": "mimo-v2.6-pro", "status": "running", "ts": 200},
+        {"route": "DIRECT", "model": "qwen3.5:9b", "status": "idle", "ts": 250},
+        {"route": "DIRECT", "agent": "mimo", "model": "mimo-v2.6-pro", "status": "idle", "ts": 300},
+    ]), encoding="utf-8")
+    r = read_router({"file": str(a)}, None)
+    assert (r["agent"], r["status"]) == ("mimo", "IDLE")
+    assert [(x["agent"] or x["model"], x["status"]) for x in r["agents"]] == \
+        [("mimo", "IDLE"), ("qwen3.5:9b", "IDLE"), ("sol", "RUNNING")]
+
     assert read_router({"file": str(tmp_path / "missing.json")}, None)["available"] is False
     assert read_router({"auto_discover": False}, tmp_path)["available"] is False
     assert [normalize_status(s) for s in ("failed", "IDLE", "weird", None)] == ["ERROR", "IDLE", "WEIRD", None]
@@ -645,6 +658,19 @@ def test_hermes_sessions_include_profiles_and_running(tmp_path):
     assert (s["today"], s["tokens_today"], s["active"]) == (3, 1120 + 20 + 2, 1)
     assert (s["last_profile"], s["last_model"], s["last_source"]) == ("mimo", "mimo-v2.6-pro", "cli")
     assert s["profiles"] == ["mimo"] and s["active_names"] == ["mimo"]
+
+    # a long quiet turn still counts while it holds an unexpired turn lease
+    c = sqlite3.connect(home / "state.db")
+    c.execute("CREATE TABLE session_turn_leases (conversation_id TEXT, holder TEXT, acquired_at TEXT, expires_at TEXT)")
+    from datetime import datetime
+    iso = lambda t: datetime.fromtimestamp(t).astimezone().isoformat()  # noqa: E731
+    c.executemany("INSERT INTO session_turn_leases VALUES (?,?,?,?)", [
+        ("x", "w1", iso(now - 900), iso(now + 60)), ("x", "w2", iso(now - 900), iso(now + 90)),
+        ("y", "w3", iso(now - 900), iso(now - 300))])  # expired
+    c.commit()
+    c.close()
+    s = hermes._sessions(home, now)
+    assert s["active"] == 2 and sorted(s["active_names"]) == ["main", "mimo"]
 
 
 def test_hermes_kanban_counts(tmp_path, monkeypatch):

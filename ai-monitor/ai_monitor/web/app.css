@@ -204,6 +204,13 @@ body > * { position: relative; z-index: 1; }
 .reason { font-size: 1.8vh; color: #b3c3de; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; }
 .na .reason { color: var(--muted); }
 .rrow small { flex: none; font-size: 1.5vh; color: var(--muted); }
+.ragent { flex: none; max-width: 30%; color: var(--violet); }
+.ragents { overflow: hidden; gap: 0.8vh; }
+.ra { flex: none; display: inline-flex; align-items: center; gap: 0.6vh; font-size: 1.6vh; color: #b3c3de;
+  padding: 0.2vh 0.9vh; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+.ra i { width: 0.8vh; height: 0.8vh; border-radius: 50%; background: var(--c); box-shadow: 0 0 0.6vh var(--c); }
+.ra.rs-running { color: var(--text); } .ra.rs-running i, .ra.rs-routing i { animation: blink 1s ease-in-out infinite; }
+.ra.rs-idle { opacity: 0.7; }
 
 /* ---------- Hermes core card ---------- */
 .hermes { gap: 1.2vh; }
@@ -344,7 +351,7 @@ html.night body { filter: brightness(0.55) saturate(0.85); }
   .foot { font-size: 11px; } .split-track { height: 10px; }
   .live { font-size: 10px; } .live b { font-size: 13px; }
   .kanban em, .kb { font-size: 9px; } .kb b { font-size: 13px; }
-  .rk, .rstat { font-size: 10px; } .rv, .route { font-size: 15px; } .reason, .rrow small { font-size: 13px; } .router-bar { padding: 10px 14px; }
+  .rk, .rstat { font-size: 10px; } .rv, .route { font-size: 15px; } .reason, .rrow small, .ra { font-size: 13px; } .router-bar { padding: 10px 14px; }
   .speed b { font-size: 26px; } .speed small, .bench-note { font-size: 12px; } .speed span { font-size: 10px; } .bench { font-size: 15px; padding: 10px 14px; }
   .ticker { order: 5; flex-basis: 100%; height: 26px; }
   .gauge { width: 110px; height: 110px; } .g-val b { font-size: 24px; } .gauge em, .g-sub { font-size: 10px; }

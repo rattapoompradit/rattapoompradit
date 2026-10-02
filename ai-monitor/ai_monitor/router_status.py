@@ -9,6 +9,8 @@ Where the decision comes from, first match wins (config.yaml `router:` section):
 Field names are looked up from common spellings (see FIELDS) at the top level or inside a nested
 "decision" / "routing" / "router" object; `fields:` overrides them with dotted paths, e.g. {model: "target.name"}.
 Nothing is inferred: a value the source does not contain is reported as missing, and no source means N/A.
+For JSON sources, "agents" also lists the latest decision of each agent (or of each model when records name no agent),
+so one agent chatting all day does not hide what the others are doing.
 """
 
 import json
@@ -23,6 +25,7 @@ import httpx
 
 FIELDS = {
     "route": ("route", "route_type", "routeType", "category", "intent", "type"),
+    "agent": ("agent", "profile", "agent_name", "assignee"),
     "model": ("model", "selected_model", "selectedModel", "target_model", "model_name"),
     "reason": ("reason", "why", "explanation", "rationale"),
     "status": ("status", "state", "phase"),
@@ -37,6 +40,7 @@ STATUS = {
 }
 AUTO_PATTERNS = ("router*.jsonl", "router*.json", "logs/router*.jsonl", "logs/router*.json")
 TAIL_BYTES = 65536
+MAX_AGENTS = 8
 
 
 def _dig(record: dict, path: str) -> Any:
@@ -84,6 +88,7 @@ def _decision(record: dict, overrides: dict) -> dict | None:
         return None  # not a routing record
     return {
         "route": str(values["route"]).strip().upper() if values["route"] is not None else None,
+        "agent": str(values["agent"]).strip() if values["agent"] is not None else None,
         "model": str(values["model"]).strip() if values["model"] is not None else None,
         "reason": str(values["reason"]).strip() if values["reason"] is not None else None,
         "status": normalize_status(values["status"]),
@@ -97,7 +102,8 @@ def _tail(path: Path) -> str:
         return f.read().decode("utf-8", "replace")
 
 
-def _from_json_file(path: Path, overrides: dict) -> dict | None:
+def _from_json_file(path: Path, overrides: dict) -> tuple[dict | None, list[dict]]:
+    """Latest decision, and the latest decision per agent (newest first)."""
     text = _tail(path)
     try:
         whole = json.loads(text)
@@ -109,10 +115,13 @@ def _from_json_file(path: Path, overrides: dict) -> dict | None:
                 records.append(json.loads(line))
             except ValueError:
                 continue
-    for record in reversed(records):
-        if isinstance(record, dict) and (d := _decision(record, overrides)):
-            return d
-    return None
+    decisions = [d for r in records if isinstance(r, dict) and (d := _decision(r, overrides))]
+    per_agent: dict[str, dict] = {}
+    for d in decisions:  # later records replace earlier ones
+        per_agent.pop(key := d["agent"] or d["model"] or "?", None)
+        per_agent[key] = d
+    agents = list(reversed(per_agent.values()))[:MAX_AGENTS]
+    return (decisions[-1] if decisions else None), agents
 
 
 def _from_log(path: Path, pattern: str) -> dict | None:
@@ -120,7 +129,7 @@ def _from_log(path: Path, pattern: str) -> dict | None:
     for line in reversed(_tail(path).splitlines()):
         if m := regex.search(line):
             groups = {k: v for k, v in m.groupdict().items() if v is not None}
-            record = {k: groups.get(k) for k in ("route", "model", "reason", "status")}
+            record = {k: groups.get(k) for k in ("route", "agent", "model", "reason", "status")}
             record["at"] = groups.get("at") or groups.get("ts")
             return _decision(record, {})
     return None
@@ -139,8 +148,8 @@ def read_router(options: dict, hermes_home: Path | None) -> dict:
             path = _expand(file)
             if not path.is_file():
                 return {"available": False, "note": f"ไม่พบไฟล์ {path}"}
-            d = _from_json_file(path, overrides)
-            return _result(d, str(path), path.stat().st_mtime)
+            d, agents = _from_json_file(path, overrides)
+            return _result(d, str(path), path.stat().st_mtime, agents)
         if log := options.get("log"):
             path = _expand(log)
             if not options.get("pattern"):
@@ -157,16 +166,18 @@ def read_router(options: dict, hermes_home: Path | None) -> dict:
             files = sorted({f for pat in AUTO_PATTERNS for f in hermes_home.glob(pat) if f.is_file()},
                            key=lambda f: f.stat().st_mtime, reverse=True)
             for path in files:
-                if d := _from_json_file(path, overrides):
-                    return _result(d, str(path), path.stat().st_mtime)
+                d, agents = _from_json_file(path, overrides)
+                if d:
+                    return _result(d, str(path), path.stat().st_mtime, agents)
     except (OSError, re.error, httpx.HTTPError, ValueError) as exc:
         return {"available": False, "note": f"อ่านข้อมูล router ไม่ได้: {type(exc).__name__}"}
     return {"available": False, "note": "ยังไม่มีข้อมูล routing จาก Hermes (ตั้งค่า router: ใน config.yaml)"}
 
 
-def _result(decision: dict | None, source: str, mtime: float | None) -> dict:
+def _result(decision: dict | None, source: str, mtime: float | None, agents: list[dict] | None = None) -> dict:
     if not decision:
         return {"available": False, "note": "ยังไม่พบการตัดสินใจของ router ในแหล่งข้อมูล", "source": source}
-    if decision["at"] is None:
-        decision["at"] = mtime
-    return {"available": True, "source": source, "read_at": time.time(), **decision}
+    for d in [decision, *(agents or [])]:
+        if d["at"] is None:
+            d["at"] = mtime
+    return {"available": True, "source": source, "read_at": time.time(), **decision, "agents": agents or []}
