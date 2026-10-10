@@ -54,6 +54,11 @@ def test_status_page_component_and_indicator():
     r = run(status_page.check, Provider("s", "S", "status_page", options={"url": "https://x/summary.json", "component": "chatgpt"}),
             lambda req: httpx.Response(200, json=other))
     assert "incident" not in r.extra and r.status == "up"
+    # incidents that name no component (e.g. OpenAI's page) stay off a healthy card
+    other["incidents"] = [{"name": "Delayed Costs data"}]
+    r = run(status_page.check, Provider("s", "S", "status_page", options={"url": "https://x/summary.json", "component": "chatgpt"}),
+            lambda req: httpx.Response(200, json=other))
+    assert ("incident" not in r.extra, r.extra["other_incidents"], r.status) == (True, ["Delayed Costs data"], "up")
     p.options["component"] = "missing"
     assert run(status_page.check, p, handler).status == "degraded"
 

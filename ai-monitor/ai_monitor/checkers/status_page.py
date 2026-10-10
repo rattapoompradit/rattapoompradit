@@ -45,23 +45,24 @@ async def _status(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     data = r.json()
 
     wanted = (p.options.get("component") or "").lower()
-    # A status page lists incidents for all of the company's products; with a component set, show only the ones
-    # that name it (an incident that lists no components could be anything, so it is still shown).
+    comp = next((c for c in data.get("components") or []
+                 if isinstance(c, dict) and wanted and wanted in str(c.get("name", "")).lower()), None)
+    healthy = comp is not None and comp.get("status") == "operational"
+    # A status page lists incidents for all of the company's products. On the card, show one only if it names the
+    # watched component, or if it names none (some pages never do) while that component is not operational.
     incidents, other = [], []
     for i in data.get("incidents") or []:
         if not isinstance(i, dict):
             continue
         names = [str(c.get("name", "")).lower() for c in i.get("components") or [] if isinstance(c, dict)]
-        (other if wanted and names and not any(wanted in n for n in names) else incidents).append(i.get("name", ""))
+        ours = any(wanted in n for n in names) if names else not healthy
+        (incidents if not wanted or ours else other).append(i.get("name", ""))
     extra: dict = {"incident": incidents[0]} if incidents else {}
     if other:
         extra["other_incidents"] = other
-    if wanted:
-        for comp in data.get("components") or []:
-            if wanted in str(comp.get("name", "")).lower():
-                state = comp.get("status", "")
-                return CheckResult(COMPONENT.get(state, "unknown"),
-                                   f"{comp['name']}: {state.replace('_', ' ')}", latency, extra)
+    if comp is not None:
+        state = comp.get("status", "")
+        return CheckResult(COMPONENT.get(state, "unknown"), f"{comp['name']}: {state.replace('_', ' ')}", latency, extra)
 
     status = data.get("status") or {}
     indicator = status.get("indicator")
