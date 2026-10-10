@@ -246,6 +246,7 @@ def test_api_and_page():
 def test_usage_claude_code(tmp_path, monkeypatch):
     from ai_monitor.checkers import usage
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr(usage.Path, "home", lambda: tmp_path / "home")
     usage._cache.clear()
     assert "ไม่พบ" in asyncio.run(usage.claude_code(None, 5))["error"]
 
@@ -269,7 +270,20 @@ def test_usage_claude_code(tmp_path, monkeypatch):
 
     creds["claudeAiOauth"]["expiresAt"] = 1000
     (tmp_path / ".credentials.json").write_text(json.dumps(creds))
-    assert "หมดอายุ" in asyncio.run(usage.claude_code(None, 5))["error"]
+    err = asyncio.run(usage.claude_code(None, 5))["error"]
+    assert "หมดอายุ" in err and "/login" in err and ".credentials.json" in err
+
+    # a stale copy loses to a login the CLI keeps fresh in another folder
+    fresh = tmp_path / "home" / ".config" / "claude"
+    fresh.mkdir(parents=True)
+    creds["claudeAiOauth"].update(accessToken="new", expiresAt=(time.time() + 3600) * 1000)
+    (fresh / ".credentials.json").write_text(json.dumps(creds))
+    seen.clear()
+
+    async def go2():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await usage.claude_code(client, 5)
+    assert asyncio.run(go2())["bars"] and seen["auth"] == "Bearer new"
 
 
 def test_usage_codex_and_status_page_integration(tmp_path, monkeypatch):

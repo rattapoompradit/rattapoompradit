@@ -3,7 +3,7 @@
 Tokens are only read (never refreshed or stored) and only sent to the provider that issued them.
 Neither endpoint is an official public API, so any failure is shown on the card, not raised.
 
-claude_code: <claude_home option, CLAUDE_CONFIG_DIR or ~/.claude>/.credentials.json {"claudeAiOauth": {"accessToken", "expiresAt"(ms)}}
+claude_code: <claude_home option, else the freshest of CLAUDE_CONFIG_DIR, ~/.claude, ~/.config/claude>/.credentials.json {"claudeAiOauth": {"accessToken", "expiresAt"(ms)}}
              GET https://api.anthropic.com/api/oauth/usage
              -> {"five_hour": {"utilization", "resets_at"(ISO)}, "seven_day": {...}, "seven_day_opus": {...}|null}
 codex:       <codex_home option, CODEX_HOME or ~/.codex>/auth.json   (one card per ChatGPT account: give each its own
@@ -64,18 +64,36 @@ def _auth_error(code: int, app: str) -> dict:
     return {"error": f"ดึงโควตาไม่ได้ (HTTP {code})"}
 
 
+def _claude_dirs(home: str | None) -> list[Path]:
+    if home:
+        return [_home("", "", home)]
+    dirs = [Path(os.environ["CLAUDE_CONFIG_DIR"])] if os.environ.get("CLAUDE_CONFIG_DIR") else []
+    return dirs + [Path.home() / ".claude", Path.home() / ".config" / "claude"]
+
+
 async def claude_code(client: httpx.AsyncClient, timeout: float, home: str | None = None) -> dict:
-    creds = _read_json(_home("CLAUDE_CONFIG_DIR", ".claude", home) / ".credentials.json") or {}
-    oauth = creds.get("claudeAiOauth") or {}
-    token = oauth.get("accessToken")
-    if not token:
-        return {"error": "ไม่พบการล็อกอิน Claude Code (รัน `claude` แล้วล็อกอินด้วย subscription)"}
-    expires = oauth.get("expiresAt")
-    if isinstance(expires, (int, float)) and expires / 1000 < time.time():
-        return {"error": "token หมดอายุ เปิด Claude Code สักครั้งเพื่อต่ออายุ"}
+    # Claude Code CLI renews .credentials.json whenever it runs; a copy no CLI renews just ages out, so take the
+    # login that is valid the longest. Hermes may read the same file for its Anthropic provider.
+    found = []
+    for folder in _claude_dirs(home):
+        path = folder / ".credentials.json"
+        oauth = (_read_json(path) or {}).get("claudeAiOauth") or {}
+        if oauth.get("accessToken"):
+            expires = oauth.get("expiresAt")
+            found.append((expires / 1000 if isinstance(expires, (int, float)) else float("inf"), path, oauth))
+    if not found:
+        return {"error": "ไม่พบการล็อกอิน Claude Code (รัน `claude` ใน terminal แล้วล็อกอินด้วย subscription)"}
+    expires_at, path, oauth = max(found, key=lambda f: f[0])
+    token = oauth["accessToken"]
+    if expires_at < time.time():
+        since = datetime.fromtimestamp(expires_at).strftime("%d/%m %H:%M")
+        return {"error": f"token ใน {path} หมดอายุตั้งแต่ {since} (ไม่มีใครต่ออายุไฟล์นี้) — "
+                         "รัน `claude` ใน terminal แล้วพิมพ์ /login เพื่อเขียนไฟล์ใหม่"}
 
     r = await client.get(CLAUDE_USAGE_URL, timeout=timeout, headers={
         "Authorization": f"Bearer {token}", "anthropic-beta": "oauth-2025-04-20"})
+    if r.status_code in (401, 403):
+        return {"error": f"token ใน {path} ใช้ไม่ได้ (HTTP {r.status_code}) — รัน `claude` ใน terminal แล้วพิมพ์ /login"}
     if r.status_code >= 400:
         return _auth_error(r.status_code, "Claude Code")
     data = r.json()

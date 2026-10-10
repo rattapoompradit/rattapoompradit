@@ -80,7 +80,7 @@ MiMo ไม่มี API บอกโควตา แถบ **Credits (ประ
 - **ChatGPT:** ติดตั้ง Codex CLI (`npm i -g @openai/codex`) แล้วรัน `codex login` ด้วยบัญชี ChatGPT (อ่านจาก `%USERPROFILE%\.codex\auth.json`)
 - **ChatGPT 2 บัญชี:** ทำการ์ด 2 ใบ (ดูตัวอย่าง `chatgpt-work` ใน `config.yaml`) ใส่ `codex_home:` คนละโฟลเดอร์ แล้วล็อกอินบัญชีละครั้ง:
   `$env:CODEX_HOME="$env:USERPROFILE\.codex-work"; codex login; Remove-Item Env:CODEX_HOME` (Claude ใช้ `claude_home:` แบบเดียวกัน)
-- ถ้าขึ้นว่า token หมดอายุ ให้เปิด Claude Code / Codex สักครั้ง
+- ถ้าขึ้นว่า token หมดอายุ: Claude ให้รัน `claude` ใน terminal แล้วพิมพ์ `/login` (แอป desktop ไม่ได้ต่ออายุไฟล์ `.credentials.json`), ChatGPT ให้เปิด Codex CLI สักครั้ง
 
 ### โมเดลที่กำลังใช้ + ส่วนแบ่งโมเดลวันนี้
 
