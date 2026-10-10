@@ -412,6 +412,7 @@ function openModal(id) {
     p.extra && p.extra.sessions && p.extra.sessions.active_names && p.extra.sessions.active_names.length
       ? ["Agent ที่กำลังทำงาน", p.extra.sessions.active_names.join(", ")] : null,
     p.extra && p.extra.incident ? ["เหตุการณ์", p.extra.incident] : null,
+    p.extra && p.extra.other_incidents ? ["เหตุการณ์ของบริการอื่น", p.extra.other_incidents.join(" · ")] : null,
     (p.model_share || []).length ? ["โมเดลวันนี้", p.model_share.map((r) => `${r.model} ${r.pct}% (${num(r.tokens)} tok)`).join(" · ")] : null,
     ["เช็คล่าสุด", p.checked_at ? `${clockSec(p.checked_at)} · ทุก ${p.interval_s} วินาที` : "-"],
     p.uptime_24h != null ? ["Uptime 24 ชม.", `${p.uptime_24h}% (เช็คสำเร็จ ไม่ใช่โควตา)`] : null,

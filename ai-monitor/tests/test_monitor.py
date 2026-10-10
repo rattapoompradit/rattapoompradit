@@ -42,6 +42,18 @@ def test_status_page_component_and_indicator():
     p = Provider("c", "C", "status_page", options={"url": "https://x/summary.json", "component": "chatgpt"})
     r = run(status_page.check, p, handler)
     assert (r.status, r.extra["incident"]) == ("down", "Login errors")
+
+    # incidents of other products on the same status page are kept out of the card
+    other = {"components": [{"name": "API", "status": "operational"}, {"name": "ChatGPT", "status": "operational"}],
+             "incidents": [{"name": "Delayed Costs data", "components": [{"name": "Compliance API"}]},
+                           {"name": "Slow logins", "components": [{"name": "ChatGPT"}]}]}
+    r = run(status_page.check, Provider("s", "S", "status_page", options={"url": "https://x/summary.json", "component": "chatgpt"}),
+            lambda req: httpx.Response(200, json=other))
+    assert (r.extra["incident"], r.extra["other_incidents"]) == ("Slow logins", ["Delayed Costs data"])
+    other["incidents"].pop()
+    r = run(status_page.check, Provider("s", "S", "status_page", options={"url": "https://x/summary.json", "component": "chatgpt"}),
+            lambda req: httpx.Response(200, json=other))
+    assert "incident" not in r.extra and r.status == "up"
     p.options["component"] = "missing"
     assert run(status_page.check, p, handler).status == "degraded"
 

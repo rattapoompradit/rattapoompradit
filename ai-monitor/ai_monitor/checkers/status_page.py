@@ -44,10 +44,18 @@ async def _status(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     r.raise_for_status()
     data = r.json()
 
-    incidents = [i.get("name", "") for i in data.get("incidents") or [] if isinstance(i, dict)]
-    extra = {"incident": incidents[0]} if incidents else {}
-
     wanted = (p.options.get("component") or "").lower()
+    # A status page lists incidents for all of the company's products; with a component set, show only the ones
+    # that name it (an incident that lists no components could be anything, so it is still shown).
+    incidents, other = [], []
+    for i in data.get("incidents") or []:
+        if not isinstance(i, dict):
+            continue
+        names = [str(c.get("name", "")).lower() for c in i.get("components") or [] if isinstance(c, dict)]
+        (other if wanted and names and not any(wanted in n for n in names) else incidents).append(i.get("name", ""))
+    extra: dict = {"incident": incidents[0]} if incidents else {}
+    if other:
+        extra["other_incidents"] = other
     if wanted:
         for comp in data.get("components") or []:
             if wanted in str(comp.get("name", "")).lower():
