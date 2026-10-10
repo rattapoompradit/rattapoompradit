@@ -19,6 +19,9 @@ SAMPLES = {
     "chatgpt": ("up", "ChatGPT: operational", 180, {"usage": {"plan": "plus", "bars": [
         {"label": "5 ชม.", "used_pct": 23, "resets_at": time.time() + 3 * 3600},
         {"label": "สัปดาห์", "used_pct": 61, "resets_at": time.time() + 2 * 86400}]}}),
+    "chatgpt-work": ("up", "ChatGPT: operational", 175, {"usage": {"plan": "team", "bars": [
+        {"label": "5 ชม.", "used_pct": 8, "resets_at": time.time() + 4 * 3600},
+        {"label": "สัปดาห์", "used_pct": 35, "resets_at": time.time() + 5 * 86400}]}}),
     "claude": ("degraded", "claude.ai: degraded performance", 210, {
         "incident": "Elevated errors on Claude Opus",
         "usage": {"plan": "max", "bars": [
@@ -71,13 +74,22 @@ def seed(monitor: Monitor) -> None:
         monitor.store.add_event(provider, frm, to, detail)
 
 
+def usage_sample() -> dict:
+    """Sample per-model token counts for today (real mode reads Hermes' state.db)."""
+    return {"gpt-6-sol": {"tokens": 1_840_000, "calls": 212}, "gpt-6-luna": {"tokens": 1_120_000, "calls": 140},
+            "claude-sonnet-5-5": {"tokens": 960_000, "calls": 88}, "claude-opus-5-5": {"tokens": 240_000, "calls": 12},
+            "mimo-v2.6-pro": {"tokens": 2_400_000, "calls": 301}, "mimo-v2.6-flash": {"tokens": 310_000, "calls": 64},
+            "glm-4.5-flash": {"tokens": 1_260_000, "calls": 842}, "nvidia/nemotron-3-nano": {"tokens": 58_400, "calls": 37}}
+
+
 def router_sample() -> dict:
     """Sample Hermes Router decision for demo mode (real mode reads it from the router's own output)."""
     now = time.time()
     agents = [
         {"route": "DIRECT", "agent": "mimo", "model": "mimo-v2.6-pro", "reason": "direct conversation", "status": "RUNNING", "at": now - 12},
         {"route": "KANBAN", "agent": "sol", "model": "gpt-6-sol", "reason": "kanban task", "status": "RUNNING", "at": now - 95},
-        {"route": "CODE", "agent": "sonnet", "model": "claude-sonnet-5", "reason": "code review", "status": "IDLE", "at": now - 640},
+        {"route": "CODE", "agent": "sonnet", "model": "claude-sonnet-5-5", "reason": "review", "status": "RUNNING", "at": now - 40},
+        {"route": "KANBAN", "agent": "luna", "model": "glm-4.5-flash", "reason": "kanban task", "status": "RUNNING", "at": now - 20},
         {"route": "DIRECT", "agent": "qwen", "model": "qwen3.5:9b", "reason": "session end", "status": "IDLE", "at": now - 2400},
     ]
     return {"available": True, **agents[0], "source": "demo", "read_at": now, "agents": agents}

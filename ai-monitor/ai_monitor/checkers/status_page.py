@@ -1,5 +1,5 @@
 """Official status pages in Atlassian Statuspage format (/api/v2/summary.json),
-plus optional subscription usage bars (option `usage: claude_code | codex`)."""
+plus optional subscription usage bars (option `usage: claude_code | codex`, login folder `codex_home` / `claude_home`)."""
 
 import time
 
@@ -23,7 +23,8 @@ async def check(p: Provider, client: httpx.AsyncClient) -> CheckResult:
     source = p.options.get("usage")
     if not source:
         return await _status(p, client)
-    quota = await usage.fetch(source, client, p.timeout_s, float(p.options.get("usage_interval_s", 300)))
+    home = p.options.get("codex_home" if source == "codex" else "claude_home")
+    quota = await usage.fetch(source, client, p.timeout_s, float(p.options.get("usage_interval_s", 300)), home)
     try:
         result = await _status(p, client)
     except (httpx.HTTPError, ValueError) as exc:

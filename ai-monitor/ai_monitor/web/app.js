@@ -102,7 +102,7 @@ function gauge(label, value, unit, pct, lv, sub = "") {
 }
 
 function head(p, tag = p.group) {
-  return `<div class="head"><span class="dot"></span><span class="name">${esc(p.name)}</span>
+  return `<div class="head"><span class="dot"></span><span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
     ${tag ? `<span class="tag">${esc(String(tag).toUpperCase())}</span>` : ""}</div>`;
 }
 
@@ -180,6 +180,47 @@ function dailyBlock(d) {
   return `<div class="bars">${rows}${plain}<div class="usage-note" title="${esc(d.note)}">${esc(d.note)}${rows ? "" : " · ยังไม่ได้ตั้งเพดาน"}</div></div>`;
 }
 
+// Which model a card's service is running right now, from the router log (latest record per agent).
+const LIVE_STALE_S = 1800; // a "running" record older than this is shown as last used (the agent may have stopped)
+function routerRecords() {
+  const r = routerLast;
+  if (!r || !r.available) return [];
+  return r.agents && r.agents.length ? r.agents : [r];
+}
+function liveFor(keys) {
+  if (!keys || !keys.length) return null;
+  const mine = routerRecords().filter((a) => a.model && keys.some((k) => a.model.toLowerCase().includes(k)));
+  if (!mine.length) return null;
+  const now = Date.now() / 1000;
+  const running = mine.filter((a) => (a.status === "RUNNING" || a.status === "ROUTING") && (!a.at || now - a.at < LIVE_STALE_S));
+  return running.length ? { running: true, list: running } : { running: false, list: [mine.sort((a, b) => (b.at || 0) - (a.at || 0))[0]] };
+}
+const shortModel = (m) => String(m || "").replace(/^.*\//, "");
+function liveLine(keys) {
+  const l = liveFor(keys);
+  if (!l) return "";
+  const a = l.list[0];
+  const tip = l.list.map((x) => [x.agent, x.model, x.route, x.status, agoText(x.at)].filter(Boolean).join(" · ")).join("\n");
+  if (l.running) {
+    const more = l.list.length > 1 ? ` <span class="more">+${l.list.length - 1}</span>` : "";
+    return `<div class="now run" title="${esc(tip)}"><i></i>กำลังใช้ <b>${esc(shortModel(a.model))}</b>${a.agent ? ` · agent ${esc(a.agent)}` : ""}${more}</div>`;
+  }
+  return `<div class="now" title="${esc(tip)}">ล่าสุด <b>${esc(shortModel(a.model))}</b>${a.agent ? ` · ${esc(a.agent)}` : ""}${a.at ? ` · ${agoText(a.at)}` : ""}</div>`;
+}
+
+// Today's split of this card's tokens between models (Hermes usage records), as one stacked bar + legend.
+const SHARE_COLORS = ["var(--cyan)", "var(--violet)", "var(--up)", "var(--muted)"];
+function shareBlock(rows) {
+  if (!rows || !rows.length) return "";
+  const total = rows.reduce((n, r) => n + r.tokens, 0);
+  const color = (r, i) => (r.other ? SHARE_COLORS[3] : SHARE_COLORS[i % 3]);
+  const tip = (r) => `${r.model} · ${num(r.tokens)} tokens · ${num(r.calls)} calls · ${r.pct}%`;
+  return `<div class="share" title="ส่วนแบ่ง token วันนี้ (จาก Hermes)">
+    <div class="share-track">${rows.map((r, i) => `<span style="width:${r.pct}%;--s:${color(r, i)}" title="${esc(tip(r))}"></span>`).join("")}</div>
+    <div class="share-legend">${rows.map((r, i) => `<span style="--s:${color(r, i)}" title="${esc(tip(r))}"><i></i>${esc(shortModel(r.model))} <b>${Math.round(r.pct)}%</b></span>`).join("")}<small>${compact(total)} tok วันนี้</small></div>
+  </div>`;
+}
+
 function providerInner(p) {
   const x = p.extra || {};
   const stats = [];
@@ -188,12 +229,16 @@ function providerInner(p) {
   if (x.vram_gb != null) stats.push(stat("VRAM", x.vram_gb, "GB"));
   if (p.uptime_24h != null) stats.push(stat("UP 24H", `${p.uptime_24h}%`));
   if (p.rate_limited_24h) stats.push(stat("429 24H", p.rate_limited_24h, "ครั้ง"));
-  const sub = x.incident ? `<div class="sub warn" title="${esc(x.incident)}">⚠ ${esc(x.incident)}</div>`
-    : x.model ? `<div class="sub" title="${esc(x.model)}">${esc(x.model)}</div>`
-    : x.usage && x.usage.plan ? `<div class="sub">แพ็กเกจ ${esc(String(x.usage.plan).toUpperCase())}</div>` : "";
+  // an incident replaces the status text (the state line already says it is degraded), keeping room for the bars
+  const sub = x.model ? `<div class="sub" title="${esc(x.model)}">${esc(x.model)}</div>` : "";
+  if (x.usage && x.usage.plan && !x.model) stats.unshift(stat("PLAN", esc(String(x.usage.plan).toUpperCase())));
+  const detail = x.incident ? `<div class="detail warn" title="${esc(`${p.detail} · ${x.incident}`)}">⚠ ${esc(x.incident)}</div>`
+    : `<div class="detail" title="${esc(p.detail)}">${esc(p.detail)}</div>`;
   return `${head(p)}${stateLine(p)}
-    <div class="detail" title="${esc(p.detail)}">${esc(p.detail)}</div>${sub}
+    ${detail}${sub}
+    ${liveLine(p.models)}
     <div class="stats">${stats.join("")}</div>
+    ${shareBlock(p.model_share)}
     ${x.usage ? usageBars(x.usage) : x.daily ? dailyBlock(x.daily) : sparkline(p.history || [])}`;
 }
 
@@ -266,6 +311,56 @@ function hermesInner(p) {
       ? errors.map((e) => `<div title="${esc(e)}">${esc(e)}</div>`).join("") : "<div>ไม่มี error ล่าสุด</div>"}</div>`;
 }
 
+// Providers with the same `card:` in config.yaml share one card: one row per provider, worst status on top
+// (one of them failing is a warning, all of them failing is down).
+function cardStatus(members) {
+  const st = members.map((m) => m.status);
+  if (st.every((x) => x === "down")) return "down";
+  if (st.some((x) => x === "down" || x === "degraded")) return "degraded";
+  return st.some((x) => x === "up") ? "up" : "unknown";
+}
+
+function memberRow(m) {
+  const x = m.extra || {}, d = x.daily;
+  const live = liveFor(m.models);
+  let usage = "";
+  if (d && d.error) usage = `<div class="usage-error" title="${esc(d.error)}">⚠ ${esc(d.error)}</div>`;
+  else if (d) {
+    const limits = d.limits || {};
+    const bars = [["requests", "REQ วันนี้", d.requests], ["tokens", "TOK วันนี้", d.tokens]].filter(([k]) => limits[k]).map(([k, label, used]) => {
+      const pct = Math.round((used * 1000) / limits[k]) / 10;
+      return bar(`${label} · ${compact(used)} / ${compact(limits[k])}`, pct, `<b>${pct}%</b>`, level(pct, 70, 90));
+    }).join("");
+    usage = bars || `<div class="msub">REQ วันนี้ <b>${compact(d.requests)}</b> · TOK วันนี้ <b>${compact(d.tokens)}</b></div>`;
+  }
+  const model = x.model ? shortModel(x.model) : m.name;
+  return `<div class="member s-${m.status}" data-id="${esc(m.id)}">
+    <div class="mrow"><span class="dot"></span><b class="mname" title="${esc(`${m.name} · ${x.model || ""}`)}">${esc(model)}</b>
+      <span class="mst">${LABEL[m.status]}</span>${live && live.running ? `<span class="mlive" title="${esc(live.list.map((a) => a.agent || a.model).join(", "))}">▶ LIVE</span>` : ""}
+      ${m.latency_ms != null ? `<span class="mlat">LAT <b>${num(m.latency_ms)}</b>ms</span>` : ""}</div>
+    ${m.status !== "up" ? `<div class="mwarn" title="${esc(m.detail)}">${esc(m.detail)}</div>` : ""}
+    ${usage}
+  </div>`;
+}
+
+function groupInner(name, members) {
+  const st = cardStatus(members);
+  const up = members.filter((m) => m.status === "up").length;
+  const limited = members.some((m) => m.extra && m.extra.daily && Object.keys(m.extra.daily.limits || {}).length);
+  const note = members.map((m) => m.card_note).find(Boolean) || (limited ? "นับจาก Hermes เท่านั้น" : "ยังไม่มีเพดานรายวัน · นับจาก Hermes เท่านั้น");
+  return `<div class="head"><span class="dot"></span><span class="name">${esc(name)}</span>
+      ${members[0].group ? `<span class="tag">${esc(String(members[0].group).toUpperCase())}</span>` : ""}</div>
+    <div class="state"><span class="code">${CODE[st]}</span><span class="th">${LABEL[st]} · ${up}/${members.length} เจ้า</span></div>
+    <div class="members">${members.map(memberRow).join("")}</div>
+    <div class="usage-note" title="${esc(note)}">${esc(note)}</div>`;
+}
+
+function groupCard(name, members) {
+  const stale = members.find(isStale);
+  return `<article class="card type-group s-${cardStatus(members)}${stale ? " stale" : ""}" data-id="${esc(`card:${name}`)}">
+    ${groupInner(name, members)}${stale ? `<span class="stale-badge">ข้อมูลเก่า ${ago(stale.checked_at)}</span>` : ""}</article>`;
+}
+
 function inner(p, providers) {
   if (p.type === "hermes") return hermesInner(p);
   if (p.type === "gpu") return gpuInner(p, providers);
@@ -307,7 +402,7 @@ function renderTicker(events) {
 
 let modalTimer = null;
 function openModal(id) {
-  const p = last.providers.find((q) => q.id === id);
+  const p = last.providers.find((q) => q.id === id) || last.providers.find((q) => q.card && `card:${q.card}` === id);
   if (!p) return;
   const unit = p.type === "gpu" ? "°C" : "ms";
   const hist = (p.history || []).filter((v) => v != null);
@@ -317,6 +412,7 @@ function openModal(id) {
     p.extra && p.extra.sessions && p.extra.sessions.active_names && p.extra.sessions.active_names.length
       ? ["Agent ที่กำลังทำงาน", p.extra.sessions.active_names.join(", ")] : null,
     p.extra && p.extra.incident ? ["เหตุการณ์", p.extra.incident] : null,
+    (p.model_share || []).length ? ["โมเดลวันนี้", p.model_share.map((r) => `${r.model} ${r.pct}% (${num(r.tokens)} tok)`).join(" · ")] : null,
     ["เช็คล่าสุด", p.checked_at ? `${clockSec(p.checked_at)} · ทุก ${p.interval_s} วินาที` : "-"],
     p.uptime_24h != null ? ["Uptime 24 ชม.", `${p.uptime_24h}% (เช็คสำเร็จ ไม่ใช่โควตา)`] : null,
     p.rate_limited_24h != null ? ["429 ใน 24 ชม.", `${p.rate_limited_24h} ครั้ง (จากการเช็คของ AI Monitor)`] : null,
@@ -468,7 +564,16 @@ function render(data, stale = false) {
     hermesEl.dataset.id = hermes.id;
     setHtml(hermesEl, hermesInner(hermes) + (st ? `<span class="stale-badge">ข้อมูลเก่า ${ago(hermes.checked_at)}</span>` : ""));
   }
-  patchCards(document.getElementById("grid"), providers.filter((p) => p !== hermes).map((p) => [p.id, card(p, providers)]));
+  const items = [], merged = new Set();
+  for (const p of providers) {
+    if (p === hermes) continue;
+    if (!p.card) items.push([p.id, card(p, providers)]);
+    else if (!merged.has(p.card)) {
+      merged.add(p.card);
+      items.push([`card:${p.card}`, groupCard(p.card, providers.filter((q) => q.card === p.card))]);
+    }
+  }
+  patchCards(document.getElementById("grid"), items);
   setHtml(document.getElementById("summary"), summary(providers));
   renderTicker(data.events || []);
   updateCountdowns();

@@ -37,6 +37,19 @@ providers:
     url: https://status.openai.com/api/v2/summary.json
     component: ChatGPT
     usage: codex              # แถบโควตา 5 ชม./สัปดาห์ จากการล็อกอิน Codex CLI (ลบบรรทัดนี้ถ้าไม่ใช้)
+    # codex_home: C:/Users/<you>/.codex   # โฟลเดอร์ล็อกอินของบัญชีนี้ (ไม่ใส่ = CODEX_HOME หรือ ~/.codex)
+    # models: [gpt]           # โมเดลที่นับเป็นของการ์ดนี้ (บรรทัด "กำลังใช้" + ส่วนแบ่งโมเดลวันนี้) ค่าเริ่มต้น gpt
+
+  # ChatGPT บัญชีที่ 2: การ์ดแยก ใช้โฟลเดอร์ล็อกอินของตัวเอง
+  # ล็อกอินครั้งเดียว (PowerShell): $env:CODEX_HOME="$env:USERPROFILE\.codex-work"; codex login; Remove-Item Env:CODEX_HOME
+  # - id: chatgpt-work
+  #   name: ChatGPT (งาน)
+  #   group: Cloud
+  #   type: status_page
+  #   url: https://status.openai.com/api/v2/summary.json
+  #   component: ChatGPT
+  #   usage: codex
+  #   codex_home: C:/Users/<you>/.codex-work
 
   - id: claude
     name: Claude
@@ -77,9 +90,12 @@ providers:
       offpeak_factor: 0.8
       console_url: https://platform.xiaomimimo.com/#/console/plan-manage
 
+  # card: ชื่อเดียวกัน = รวมเป็นการ์ดใบเดียว (แถวละเจ้า, สถานะการ์ด = แย่สุด: ล่มเจ้าเดียว = เหลือง, ล่มหมด = แดง)
   - id: glm
     name: Z.ai GLM Flash
     group: Free
+    card: Free Tier
+    card_note: ไม่มีเพดานรายวัน (GLM = concurrency / Nemotron = RPM) · นับจาก Hermes เท่านั้น
     type: openai_compat
     base_url: https://api.z.ai/api/paas/v4
     api_key_env: ZAI_API_KEY
@@ -93,6 +109,7 @@ providers:
   - id: nemotron
     name: Nemotron 3
     group: Free
+    card: Free Tier
     type: openai_compat
     base_url: https://integrate.api.nvidia.com/v1
     api_key_env: NVIDIA_API_KEY

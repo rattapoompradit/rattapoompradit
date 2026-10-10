@@ -3,10 +3,11 @@
 Tokens are only read (never refreshed or stored) and only sent to the provider that issued them.
 Neither endpoint is an official public API, so any failure is shown on the card, not raised.
 
-claude_code: <CLAUDE_CONFIG_DIR or ~/.claude>/.credentials.json {"claudeAiOauth": {"accessToken", "expiresAt"(ms)}}
+claude_code: <claude_home option, CLAUDE_CONFIG_DIR or ~/.claude>/.credentials.json {"claudeAiOauth": {"accessToken", "expiresAt"(ms)}}
              GET https://api.anthropic.com/api/oauth/usage
              -> {"five_hour": {"utilization", "resets_at"(ISO)}, "seven_day": {...}, "seven_day_opus": {...}|null}
-codex:       <CODEX_HOME or ~/.codex>/auth.json {"tokens": {"access_token", "account_id"}}
+codex:       <codex_home option, CODEX_HOME or ~/.codex>/auth.json   (one card per ChatGPT account: give each its own
+             codex_home and run `CODEX_HOME=<that folder> codex login` once per account) {"tokens": {"access_token", "account_id"}}
              GET https://chatgpt.com/backend-api/wham/usage
              -> {"plan_type", "rate_limit": {"primary_window": {"used_percent", "limit_window_seconds", "reset_at"(epoch)},
                                              "secondary_window": {...}}}
@@ -26,7 +27,9 @@ CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 CLAUDE_WINDOWS = (("five_hour", "5 ชม."), ("seven_day", "สัปดาห์"), ("seven_day_opus", "Opus/สัปดาห์"))
 
 
-def _home(env: str, default: str) -> Path:
+def _home(env: str, default: str, configured: str | None = None) -> Path:
+    if configured:
+        return Path(os.path.expandvars(str(configured))).expanduser()
     return Path(os.environ.get(env) or Path.home() / default)
 
 
@@ -61,8 +64,8 @@ def _auth_error(code: int, app: str) -> dict:
     return {"error": f"ดึงโควตาไม่ได้ (HTTP {code})"}
 
 
-async def claude_code(client: httpx.AsyncClient, timeout: float) -> dict:
-    creds = _read_json(_home("CLAUDE_CONFIG_DIR", ".claude") / ".credentials.json") or {}
+async def claude_code(client: httpx.AsyncClient, timeout: float, home: str | None = None) -> dict:
+    creds = _read_json(_home("CLAUDE_CONFIG_DIR", ".claude", home) / ".credentials.json") or {}
     oauth = creds.get("claudeAiOauth") or {}
     token = oauth.get("accessToken")
     if not token:
@@ -85,12 +88,13 @@ async def claude_code(client: httpx.AsyncClient, timeout: float) -> dict:
     return {"plan": oauth.get("subscriptionType"), "bars": bars}
 
 
-async def codex(client: httpx.AsyncClient, timeout: float) -> dict:
-    auth = _read_json(_home("CODEX_HOME", ".codex") / "auth.json") or {}
+async def codex(client: httpx.AsyncClient, timeout: float, home: str | None = None) -> dict:
+    folder = _home("CODEX_HOME", ".codex", home)
+    auth = _read_json(folder / "auth.json") or {}
     tokens = auth.get("tokens") or {}
     token = tokens.get("access_token")
     if not token:
-        return {"error": "ไม่พบการล็อกอิน Codex CLI (รัน `codex login` ด้วยบัญชี ChatGPT)"}
+        return {"error": f"ไม่พบการล็อกอิน Codex CLI ใน {folder} (รัน `codex login` ด้วยบัญชี ChatGPT)"}
     headers = {"Authorization": f"Bearer {token}"}
     if tokens.get("account_id"):
         headers["ChatGPT-Account-Id"] = tokens["account_id"]
@@ -114,14 +118,16 @@ SOURCES = {"claude_code": claude_code, "codex": codex}
 _cache: dict[str, tuple[float, dict]] = {}
 
 
-async def fetch(source: str, client: httpx.AsyncClient, timeout: float, every_s: float = 300) -> dict:
-    """Usage for `source`, re-fetched at most every `every_s` seconds."""
-    cached = _cache.get(source)
+async def fetch(source: str, client: httpx.AsyncClient, timeout: float, every_s: float = 300,
+                home: str | None = None) -> dict:
+    """Usage for `source` (from the login in `home`, if given), re-fetched at most every `every_s` seconds."""
+    key = f"{source}|{home or ''}"
+    cached = _cache.get(key)
     if cached and time.time() - cached[0] < every_s:
         return cached[1]
     try:
-        result = await SOURCES[source](client, timeout)
+        result = await SOURCES[source](client, timeout, home)
     except (httpx.HTTPError, ValueError) as exc:
         result = {"error": f"ดึงโควตาไม่ได้: {type(exc).__name__}"}
-    _cache[source] = (time.time(), result)
+    _cache[key] = (time.time(), result)
     return result

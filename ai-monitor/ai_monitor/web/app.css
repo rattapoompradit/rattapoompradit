@@ -140,6 +140,8 @@ body > * { position: relative; z-index: 1; }
 .code { font-family: var(--head); font-weight: 900; font-size: 3.9vh; letter-spacing: 0.12em; color: var(--c);
   text-shadow: 0 0 1.4vh color-mix(in srgb, var(--c) 70%, transparent); line-height: 1.05; }
 .th { font-size: 1.9vh; color: var(--muted); }
+.card > .detail, .card > .sub, .card > .now, .card > .stats, .card > .share { flex: none; } /* never squeezed by the bars */
+.detail.warn { color: var(--degraded); }
 .detail { color: #b3c3de; font-size: 2vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { color: var(--muted); font-size: 1.8vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .warn { color: var(--degraded); }
@@ -170,6 +172,41 @@ body > * { position: relative; z-index: 1; }
 .usage-note { font-size: 1.5vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -0.4vh; }
 .modal-card .usage-note { white-space: normal; }
 .usage-error { margin-top: auto; color: var(--degraded); font-size: 1.8vh; }
+
+/* model in use right now (router log) + today's token split between models */
+.now { font-size: 1.8vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now b { color: #b3c3de; font-weight: 600; }
+.now.run { color: #b3c3de; }
+.now.run b { color: var(--up); }
+.now.run i { display: inline-block; width: 0.9vh; height: 0.9vh; margin-right: 0.8vh; border-radius: 50%; background: var(--up);
+  box-shadow: 0 0 0.8vh var(--up); animation: blink 1s ease-in-out infinite; vertical-align: middle; }
+.now .more { color: var(--muted); }
+.share { display: flex; flex-direction: column; gap: 0.5vh; }
+.share-track { display: flex; height: 0.9vh; border-radius: 99px; overflow: hidden; background: rgba(255, 255, 255, 0.06); }
+.share-track span { background: var(--s); box-shadow: 0 0 0.8vh color-mix(in srgb, var(--s) 50%, transparent); }
+.share-track span + span { border-left: 1px solid rgba(0, 0, 0, 0.5); }
+.share-legend { display: flex; gap: 1.2vh; font-size: 1.5vh; color: var(--muted); white-space: nowrap; overflow: hidden; min-width: 0; }
+.share-legend span { display: inline-flex; align-items: center; gap: 0.5vh; min-width: 0; }
+.share-legend b { color: var(--text); font-weight: 600; }
+.share-legend i { width: 0.8vh; height: 0.8vh; border-radius: 0.2vh; background: var(--s); flex: none; }
+.share-legend small { margin-left: auto; flex: none; font-size: inherit; }
+
+/* one card for several providers (config `card:`) */
+.members { display: flex; flex-direction: column; gap: 0.9vh; margin-top: 0.4vh; }
+.member { display: flex; flex-direction: column; gap: 0.5vh; padding: 0.9vh 1.1vh; border-radius: 0.8vh; cursor: pointer;
+  background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.06); border-left: 0.3vh solid var(--c); min-width: 0; }
+.member .dot { width: 1.1vh; height: 1.1vh; }
+.member.s-down { animation: none; }
+.mrow { display: flex; align-items: baseline; gap: 1vh; min-width: 0; white-space: nowrap; }
+.mname { font-size: 2.1vh; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mst { font-size: 1.6vh; color: var(--c); flex: none; }
+.mlive { font-family: var(--head); font-size: 1.2vh; letter-spacing: 0.15em; color: var(--up); flex: none; animation: blink 1s ease-in-out infinite; }
+.mlat { margin-left: auto; font-size: 1.6vh; color: var(--muted); flex: none; }
+.mlat b { color: var(--text); font-weight: 600; }
+.msub { font-size: 1.7vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msub b { color: var(--text); font-weight: 600; }
+.mwarn { font-size: 1.6vh; color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.type-group > .usage-note { margin-top: auto; }
 
 /* ---------- Hermes Kanban row ---------- */
 .kanban { display: flex; align-items: center; gap: 0.8vh; flex-wrap: wrap; }
@@ -347,7 +384,7 @@ html.night body { filter: brightness(0.55) saturate(0.85); }
   .brand b { font-size: 16px; } .brand small, .tag, .link, .stat em, .tile em { font-size: 9px; }
   .logo { width: 30px; height: 30px; } .clock { font-size: 22px; } .pill b { font-size: 18px; }
   .name, .hermes .name { font-size: 19px; } .code { font-size: 24px; } .core { width: 64px; height: 64px; } .core span { font-size: 22px; }
-  .detail, .sub, .th, .stat, .bar-head, .chip, .tile small, .console, .tk, .pill span, .timebox small, .usage-error, .gpu-name, .stale-badge, .modal-side dl, .split-head, .unload, .idle-note { font-size: 13px; }
+  .now, .msub, .mwarn, .mst, .mlat, .share-legend, .detail, .sub, .th, .stat, .bar-head, .chip, .tile small, .console, .tk, .pill span, .timebox small, .usage-error, .gpu-name, .stale-badge, .modal-side dl, .split-head, .unload, .idle-note { font-size: 13px; }
   .foot { font-size: 11px; } .split-track { height: 10px; }
   .live { font-size: 10px; } .live b { font-size: 13px; }
   .kanban em, .kb { font-size: 9px; } .kb b { font-size: 13px; }

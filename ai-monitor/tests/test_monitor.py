@@ -795,3 +795,69 @@ def test_gpu_nvml_backend(monkeypatch):
     assert (r.status, g["name"], g["temp"], g["util"], g["mem_used_mb"], g["power_w"], g["fan"]) == \
         ("up", "NVIDIA GeForce RTX 4060 Laptop GPU", 61.0, 37.0, 2048, 55.5, None)
     assert r.extra["vram_pct"] == 25 and "VRAM 2.0/8.0 GB" in r.detail
+
+
+def test_codex_home_per_provider(tmp_path, monkeypatch):
+    from ai_monitor.checkers import usage
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+    usage._cache.clear()
+    for name, token in (("personal", "tok-a"), ("work", "tok-b")):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "auth.json").write_text(json.dumps({"tokens": {"access_token": token}}))
+    seen = []
+
+    def handler(req):
+        if req.url.host == "chatgpt.com":
+            seen.append(req.headers["authorization"])
+            pct = 10 if req.headers["authorization"] == "Bearer tok-a" else 70
+            return httpx.Response(200, json={"plan_type": "plus", "rate_limit": {
+                "primary_window": {"used_percent": pct, "limit_window_seconds": 18000, "reset_at": 1893456000}}})
+        return httpx.Response(200, json={"status": {"indicator": "none", "description": "ok"}})
+
+    opts = {"url": "https://status/summary.json", "usage": "codex"}
+    a = run(status_page.check, Provider("a", "A", "status_page", options={**opts, "codex_home": str(tmp_path / "personal")}), handler)
+    b = run(status_page.check, Provider("b", "B", "status_page", options={**opts, "codex_home": str(tmp_path / "work")}), handler)
+    assert seen == ["Bearer tok-a", "Bearer tok-b"]  # separate logins, separate cache entries
+    assert (a.extra["usage"]["bars"][0]["used_pct"], b.extra["usage"]["bars"][0]["used_pct"]) == (10, 70)
+    missing = run(status_page.check, Provider("c", "C", "status_page", options={**opts, "codex_home": str(tmp_path / "none")}), handler)
+    assert "none" in missing.extra["usage"]["error"]
+
+
+def test_model_usage_share_and_card_fields(tmp_path):
+    from ai_monitor import model_usage
+    home = tmp_path / "hermes"
+    (home / "profiles" / "sol").mkdir(parents=True)
+    now = time.time()
+
+    def make(db, rows):
+        c = sqlite3.connect(db)
+        c.execute("CREATE TABLE session_model_usage (model TEXT, api_call_count INT, input_tokens INT, output_tokens INT,"
+                  " cache_read_tokens INT, cache_write_tokens INT, last_seen REAL)")
+        c.executemany("INSERT INTO session_model_usage VALUES (?,?,?,?,?,?,?)", rows)
+        c.commit()
+        c.close()
+
+    make(home / "state.db", [("gpt-6-sol", 3, 100, 50, 0, 0, now), ("claude-sonnet-5-5", 1, 10, 10, 0, 0, now),
+                             ("gpt-6-sol", 9, 999, 0, 0, 0, now - 3 * 86400)])  # older than today: not counted
+    make(home / "profiles" / "sol" / "state.db", [("gpt-6-luna", 2, 40, 10, 0, 0, now), ("gpt-6-sol", 1, 50, 0, 0, 0, now)])
+    usage = model_usage.read_today(home, now)
+    assert usage["gpt-6-sol"] == {"tokens": 200, "calls": 4} and usage["gpt-6-luna"]["tokens"] == 50
+    rows = model_usage.share(usage, ["gpt"])
+    assert [(r["model"], r["pct"]) for r in rows] == [("gpt-6-sol", 80.0), ("gpt-6-luna", 20.0)]
+    assert model_usage.share(usage, ["mimo"]) == []
+
+    keys = model_usage.model_keys
+    assert keys(Provider("c", "C", "status_page", options={"usage": "codex"})) == ["gpt"]
+    assert keys(Provider("c", "C", "status_page", options={"usage": "claude_code"})) == ["claude"]
+    assert keys(Provider("g", "G", "openai_compat", options={"daily": {"match": "GLM"}})) == ["glm"]
+    assert keys(Provider("m", "M", "openai_compat", options={"credits": {"match": "mimo"}, "models": ["mimo-v2.6"]})) == ["mimo-v2.6"]
+    assert keys(Provider("o", "O", "ollama")) == []
+
+    cfg = Config(providers=[Provider("glm", "GLM", "openai_compat", options={"card": "Free Tier", "daily": {"match": "glm"}}),
+                            Provider("chatgpt", "ChatGPT", "status_page", options={"usage": "codex"})])
+    app = create_app(cfg, store=Store(":memory:"), start=False, router_reader=dict,
+                     usage_reader=lambda: {"gpt-6-sol": {"tokens": 30, "calls": 1}, "glm-4.5-flash": {"tokens": 10, "calls": 1}})
+    with TestClient(app) as client:
+        p = {x["id"]: x for x in client.get("/api/status").json()["providers"]}
+    assert (p["glm"]["card"], p["glm"]["models"], p["chatgpt"]["card"]) == ("Free Tier", ["glm"], None)
+    assert p["chatgpt"]["model_share"][0] == {"model": "gpt-6-sol", "tokens": 30, "calls": 1, "pct": 100.0}

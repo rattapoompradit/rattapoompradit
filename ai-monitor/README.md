@@ -70,6 +70,7 @@ MiMo ไม่มี API บอกโควตา แถบ **Credits (ประ
 - **ใช้วันนี้:** requests / tokens ที่ Hermes ใช้กับโมเดลที่ตรง `daily.match` วันนี้ (จาก `state.db`) ถ้าใส่ `daily.requests` / `daily.tokens` จะเป็นแถบ % เทียบเพดาน ไม่ใส่จะแสดงตัวเลขอย่างเดียว รีเซ็ตตาม `daily.reset` (`local` เที่ยงคืนเวลาไทย / `utc`)
 - **429 24H:** จำนวนครั้งที่ AI Monitor เช็คแล้วโดน rate limit ใน 24 ชม.
 - กราฟ latency ย้ายไปอยู่ในหน้ารายละเอียด (แตะการ์ด) เมื่อมีแถบ "ใช้วันนี้"
+- **การ์ดเดียว:** ใส่ `card: Free Tier` ให้ทุกเจ้าที่อยากรวม จะได้การ์ดใบเดียว แถวละเจ้า (โมเดล, สถานะ, LAT, ใช้วันนี้) สถานะการ์ด = แย่สุด: ล่มเจ้าเดียว = WARNING เหลือง, ล่มหมด = OFFLINE แดง (`card_note:` = ข้อความใต้การ์ด) แตะแถวเพื่อดูรายละเอียดของเจ้านั้น
 
 ### แถบโควตา ChatGPT / Claude
 
@@ -77,7 +78,16 @@ MiMo ไม่มี API บอกโควตา แถบ **Credits (ประ
 
 - **Claude:** ติดตั้ง [Claude Code](https://claude.com/claude-code) แล้วรัน `claude` ล็อกอินด้วยบัญชี Pro/Max (อ่านจาก `%USERPROFILE%\.claude\.credentials.json`)
 - **ChatGPT:** ติดตั้ง Codex CLI (`npm i -g @openai/codex`) แล้วรัน `codex login` ด้วยบัญชี ChatGPT (อ่านจาก `%USERPROFILE%\.codex\auth.json`)
+- **ChatGPT 2 บัญชี:** ทำการ์ด 2 ใบ (ดูตัวอย่าง `chatgpt-work` ใน `config.yaml`) ใส่ `codex_home:` คนละโฟลเดอร์ แล้วล็อกอินบัญชีละครั้ง:
+  `$env:CODEX_HOME="$env:USERPROFILE\.codex-work"; codex login; Remove-Item Env:CODEX_HOME` (Claude ใช้ `claude_home:` แบบเดียวกัน)
 - ถ้าขึ้นว่า token หมดอายุ ให้เปิด Claude Code / Codex สักครั้ง
+
+### โมเดลที่กำลังใช้ + ส่วนแบ่งโมเดลวันนี้
+
+- **กำลังใช้ / ล่าสุด:** การ์ด ChatGPT / Claude / MiMo (และแถว ▶ LIVE ในการ์ด Free Tier) ขึ้นโมเดลที่ agent กำลังใช้จาก router log (`router-decisions.jsonl`) เช่น `กำลังใช้ claude-sonnet-5-5 · agent sonnet` ถ้าไม่มีงานรันจะขึ้นโมเดลล่าสุด
+- **แถบสี:** ส่วนแบ่ง token วันนี้ของโมเดลในการ์ดนั้น (จาก `session_model_usage` ใน `state.db` ทุก profile) 3 อันดับแรก + อื่น ๆ
+- โมเดลที่นับเป็นของการ์ด: ChatGPT = ชื่อมี `gpt`, Claude = `claude`, MiMo = `credits.match`, Free tier = `daily.match` เปลี่ยนได้ด้วย `models: [...]`
+- การ์ด ChatGPT 2 บัญชีจะเห็นโมเดลชุดเดียวกัน (ชื่อโมเดลไม่ได้บอกว่าเป็นบัญชีไหน)
 - endpoint ที่ใช้ไม่ใช่ API ทางการ ถ้าผู้ให้บริการเปลี่ยน แถบจะขึ้นข้อความ error แทน (ส่วนสถานะยังทำงาน) ไม่อยากใช้ให้ลบบรรทัด `usage:` ใน `config.yaml`
 - สีแถบ: เขียว < 70%, เหลือง 70–89%, แดง ≥ 90% และถ้าใช้หมด 100% การ์ดจะเป็น WARNING
 

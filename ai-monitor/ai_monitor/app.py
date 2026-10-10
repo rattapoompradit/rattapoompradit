@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import model_usage
 from .checkers import hermes, ollama
 from .config import Config
 from .engine import Monitor
@@ -19,12 +20,16 @@ WEB = Path(__file__).parent / "web"
 
 
 def create_app(cfg: Config, store: Store | None = None, start: bool = True,
-               router_reader: Callable[[], dict] | None = None) -> FastAPI:
+               router_reader: Callable[[], dict] | None = None,
+               usage_reader: Callable[[], dict] | None = None) -> FastAPI:
     store = store or Store(cfg.db_path)
+    hermes_p = next((p for p in cfg.providers if p.type == "hermes"), None)
+    home = hermes.resolve_home(hermes_p.options if hermes_p else {})
     if router_reader is None:
-        hermes_p = next((p for p in cfg.providers if p.type == "hermes"), None)
-        home = hermes.resolve_home(hermes_p.options if hermes_p else {})
         router_reader = lambda: read_router(cfg.router, home)  # noqa: E731
+    if usage_reader is None:
+        usage_reader = lambda: model_usage.read_today(home)  # noqa: E731
+    keys = {p.id: model_usage.model_keys(p) for p in cfg.providers}
     monitor = Monitor(cfg, store)
 
     @contextlib.asynccontextmanager
@@ -42,11 +47,15 @@ def create_app(cfg: Config, store: Store | None = None, start: bool = True,
     @app.get("/api/status")
     def status() -> dict:
         day_ago = time.time() - 86400
+        today = usage_reader() if any(keys.values()) else {}
         providers = []
         for p in cfg.providers:
             state = monitor.state.get(p.id) or {"status": "unknown", "detail": "กำลังเช็ค…", "extra": {}}
             providers.append({
                 "id": p.id, "name": p.name, "group": p.group, "type": p.type, "interval_s": p.interval_s, **state,
+                # card: providers sharing this name are shown as one card; models: which router/usage models are theirs
+                "card": p.options.get("card"), "card_note": p.options.get("card_note"), "models": keys[p.id],
+                "model_share": model_usage.share(today, keys[p.id]) if keys[p.id] else [],
                 "history": store.latencies(p.id, extra_key="temp" if p.type == "gpu" else None),
                 "uptime_24h": store.uptime_pct(p.id, day_ago),
                 "rate_limited_24h": store.count_detail(p.id, day_ago, "%HTTP 429%") if p.type == "openai_compat" else None,
@@ -88,8 +97,8 @@ def build_app(cfg: Config, demo: bool = False) -> FastAPI:
     """The app with real checks, or with sample data and no checks when `demo`."""
     if not demo:
         return create_app(cfg)
-    from .demo import router_sample, seed
+    from .demo import router_sample, seed, usage_sample
 
-    app = create_app(cfg, store=Store(":memory:"), start=False, router_reader=router_sample)
+    app = create_app(cfg, store=Store(":memory:"), start=False, router_reader=router_sample, usage_reader=usage_sample)
     seed(app.state.monitor)
     return app
