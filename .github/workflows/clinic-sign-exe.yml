@@ -1,0 +1,60 @@
+name: Clinic Sign EXE
+
+on:
+  push:
+    branches: [ccr-32d88622-9zwzca]
+    paths: ["clinic-sign/**", ".github/workflows/clinic-sign-exe.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: clinic-sign
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: clinic-sign/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build ClinicSign-Setup.exe
+        run: npm run dist
+
+      - name: Smoke test (packaged app, real input events)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\win-unpacked\ClinicSign.exe -ArgumentList "--selftest","--logos=test\fixtures" -Wait -PassThru
+          Get-Content selftest.txt
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClinicSign-Setup
+          path: clinic-sign/dist/ClinicSign-Setup.exe
+
+      - name: Publish to the "clinic-sign-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: clinic-sign-latest
+          name: Clinic Sign (latest build)
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          files: clinic-sign/dist/ClinicSign-Setup.exe
+          body: |
+            Latest Windows installer of Clinic Sign from `${{ github.ref_name }}` (${{ github.sha }}).
+            Run ClinicSign-Setup.exe, then put logo images in Documents\ClinicLogos (file name = clinic name).
+            Exit: hold the top-left corner for 5 seconds, or Ctrl+Shift+Q.

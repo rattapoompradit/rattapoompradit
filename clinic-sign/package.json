@@ -1,0 +1,38 @@
+{
+  "name": "clinic-sign",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Touch-screen kiosk: pick a clinic logo and sign on screen (nothing is saved)",
+  "author": "rattapoompradit",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron . --windowed --logos=test/fixtures",
+    "test": "node --test \"test/*.test.js\"",
+    "selftest": "electron . --selftest --logos=test/fixtures",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "build": {
+    "appId": "com.rattapoompradit.clinicsign",
+    "productName": "ClinicSign",
+    "files": [
+      "main.js",
+      "preload.js",
+      "selftest.js",
+      "web/**"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "ClinicSign-Setup.exe",
+      "createDesktopShortcut": true,
+      "runAfterFinish": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3"
+  }
+}

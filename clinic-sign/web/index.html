@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Clinic Sign</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Admin exit: hold the top-left corner for 5 seconds (or Ctrl+Shift+Q). -->
+  <div id="corner" aria-hidden="true"></div>
+
+  <main id="home" class="page">
+    <header class="search-bar">
+      <label class="search-box">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input id="search" type="text" placeholder="ค้นหาชื่อคลินิก" inputmode="none" virtualkeyboardpolicy="manual" autocomplete="off" spellcheck="false">
+        <button id="search-clear" type="button" class="icon-btn" aria-label="ล้างคำค้นหา" hidden>✕</button>
+      </label>
+      <p id="count" class="count"></p>
+    </header>
+    <section id="grid" class="grid"></section>
+    <p id="empty" class="empty" hidden></p>
+    <div id="keyboard" class="keyboard" hidden></div>
+  </main>
+
+  <main id="sign" class="page" hidden>
+    <div class="sign-logo">
+      <img id="sign-img" alt="" draggable="false">
+      <h1 id="sign-name"></h1>
+    </div>
+    <div class="pad">
+      <p id="pad-hint" class="pad-hint">เซ็นชื่อในกรอบนี้</p>
+      <div class="pad-line"></div>
+      <canvas id="pad"></canvas>
+    </div>
+    <div class="actions">
+      <button id="btn-clear" type="button" class="btn btn-clear">ลบ</button>
+      <button id="btn-back" type="button" class="btn btn-back">กลับ</button>
+    </div>
+  </main>
+
+  <script src="logic.js"></script>
+  <script src="keyboard.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
