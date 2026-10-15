@@ -5,7 +5,7 @@
   // "012 คลินิกหมอฟัน.png" -> { name: "คลินิกหมอฟัน", order: 12 }; the number prefix only sets the order.
   function parseLogoFile(file) {
     const dot = file.lastIndexOf('.');
-    if (dot <= 0 || /^[.~]/.test(file)) return null;
+    if (dot <= 0 || /^[.~_]/.test(file)) return null;
     if (!IMAGE_EXT.includes(file.slice(dot).toLowerCase())) return null;
     let name = file.slice(0, dot).normalize('NFC').trim();
     let order = Number.MAX_SAFE_INTEGER;
@@ -15,6 +15,12 @@
       name = m[2].trim();
     }
     return { name, order };
+  }
+
+  // "_background.jpg" in the logo folder is the page background, not a clinic.
+  function isBackgroundFile(file) {
+    const dot = file.lastIndexOf('.');
+    return /^_background\./i.test(file) && IMAGE_EXT.includes(file.slice(dot).toLowerCase());
   }
 
   function sortLogos(items) {
@@ -32,7 +38,7 @@
     return !q || searchKey(name).includes(q);
   }
 
-  const api = { IMAGE_EXT, parseLogoFile, sortLogos, searchKey, matches };
+  const api = { IMAGE_EXT, parseLogoFile, isBackgroundFile, sortLogos, searchKey, matches };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

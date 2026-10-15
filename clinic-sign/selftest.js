@@ -75,6 +75,8 @@ module.exports = async function selftest(win, { out, shots }) {
       'logo images load',
       await waitFor(`[...document.querySelectorAll('.tile img')].every(i => i.complete && i.naturalWidth > 0)`),
     );
+    const bg = await js(`document.body.classList.contains('has-bg') && getComputedStyle(document.body).backgroundImage`);
+    check('background image applied (if _background.* exists)', bg && bg.includes('_background'), String(bg).slice(0, 80));
     await shot('1-home');
 
     await tap('#search');

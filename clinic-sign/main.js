@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, powerSaveBlocker } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { parseLogoFile, sortLogos } = require('./web/logic.js');
+const { parseLogoFile, isBackgroundFile, sortLogos } = require('./web/logic.js');
 
 const args = process.argv.slice(1);
 const flag = (name) => args.includes(`--${name}`);
@@ -25,24 +25,31 @@ function logosDir() {
   return dir;
 }
 
+// mtime in the URL so a replaced file with the same name is not served from cache.
+function fileUrl(full) {
+  return `${pathToFileURL(full).href}?v=${Math.round(fs.statSync(full).mtimeMs)}`;
+}
+
 function listLogos(dir) {
   const items = [];
+  let background = null;
   let entries = [];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
-    return { dir, items };
+    return { dir, items, background };
   }
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const parsed = parseLogoFile(entry.name);
-    if (!parsed) continue;
     const full = path.join(dir, entry.name);
-    // mtime in the URL so a replaced file with the same name is not served from cache.
-    const version = Math.round(fs.statSync(full).mtimeMs);
-    items.push({ ...parsed, url: `${pathToFileURL(full).href}?v=${version}` });
+    if (isBackgroundFile(entry.name)) {
+      background = fileUrl(full);
+      continue;
+    }
+    const parsed = parseLogoFile(entry.name);
+    if (parsed) items.push({ ...parsed, url: fileUrl(full) });
   }
-  return { dir, items: sortLogos(items) };
+  return { dir, items: sortLogos(items), background };
 }
 
 function watchLogos(dir) {

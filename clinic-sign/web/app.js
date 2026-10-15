@@ -240,11 +240,23 @@
   }
 
   // ---------- logos ----------
+  function applyBackground(url) {
+    document.body.classList.toggle('has-bg', !!url);
+    if (url) document.body.style.setProperty('--bg-image', `url("${url}")`);
+    else document.body.style.removeProperty('--bg-image');
+  }
+
+  let loaded = null;
   async function loadLogos() {
     if (window.kiosk) {
       const res = await window.kiosk.listLogos();
+      // The folder watcher also fires when a file is only read (access time); skip if nothing changed.
+      const signature = JSON.stringify(res);
+      if (signature === loaded) return;
+      loaded = signature;
       dir = res.dir;
       logos = res.items;
+      applyBackground(res.background);
     } else {
       dir = '(เปิดผ่านโปรแกรม ClinicSign เท่านั้น)';
     }

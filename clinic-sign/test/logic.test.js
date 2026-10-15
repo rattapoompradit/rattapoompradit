@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseLogoFile, sortLogos, matches } = require('../web/logic.js');
+const { parseLogoFile, isBackgroundFile, sortLogos, matches } = require('../web/logic.js');
 const { TH } = require('../web/keyboard.js');
 
 test('file name becomes clinic name; number prefix sets order', () => {
@@ -10,8 +10,16 @@ test('file name becomes clinic name; number prefix sets order', () => {
   assert.equal(parseLogoFile('1234.png').name, '1234');
 });
 
+test('_background.* is the background, never a clinic', () => {
+  for (const f of ['_background.jpg', '_Background.PNG', '_background.webp']) {
+    assert.ok(isBackgroundFile(f), f);
+    assert.equal(parseLogoFile(f), null, f);
+  }
+  for (const f of ['_background.txt', 'background.jpg', '_bg.jpg']) assert.ok(!isBackgroundFile(f), f);
+});
+
 test('non-image and hidden files are skipped', () => {
-  for (const f of ['readme.txt', 'Thumbs.db', '.DS_Store', '~$temp.png', 'noext']) {
+  for (const f of ['readme.txt', 'Thumbs.db', '.DS_Store', '~$temp.png', '_note.png', 'noext']) {
     assert.equal(parseLogoFile(f), null, f);
   }
 });

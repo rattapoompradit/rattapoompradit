@@ -56,5 +56,5 @@ jobs:
           files: clinic-sign/dist/ClinicSign-Setup.exe
           body: |
             Latest Windows installer of Clinic Sign from `${{ github.ref_name }}` (${{ github.sha }}).
-            Run ClinicSign-Setup.exe, then put logo images in Documents\ClinicLogos (file name = clinic name).
+            Run ClinicSign-Setup.exe, then put logo images in Documents\ClinicLogos (file name = clinic name); optional _background.jpg there sets the background.
             Exit: hold the top-left corner for 5 seconds, or Ctrl+Shift+Q.

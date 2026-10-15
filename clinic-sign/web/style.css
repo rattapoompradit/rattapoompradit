@@ -8,6 +8,7 @@
   --accent-text: #ffffff;
   --danger: #b42318;
   --ink: #14213d;
+  --glass: rgb(255 255 255 / 0.88); /* text backing that stays readable over a background image */
   --radius: 1rem;
   --gap: clamp(10px, 1.6vmin, 22px);
   color-scheme: light;
@@ -28,6 +29,13 @@ html, body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
   touch-action: manipulation;
+}
+
+body.has-bg {
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -51,7 +59,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------- home ---------- */
 .search-bar {
   padding: var(--gap) var(--gap) calc(var(--gap) / 2);
-  background: var(--bg);
 }
 
 .search-box {
@@ -87,7 +94,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--muted);
 }
 
-.count { margin: 0.5rem 0.4rem 0; color: var(--muted); font-size: 0.85rem; }
+.count {
+  display: inline-block;
+  margin: 0.5rem 0 0;
+  padding: 0.15rem 0.8rem;
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
 
 .grid {
   flex: 1;
@@ -131,9 +146,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .empty {
-  flex: 1;
-  margin: 0;
+  margin: var(--gap) var(--gap) auto;
   padding: 2rem var(--gap);
+  border-radius: var(--radius);
+  background: var(--glass);
   text-align: center;
   color: var(--muted);
   overflow-wrap: anywhere;
@@ -178,7 +194,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   gap: 0.5rem;
 }
 .sign-logo img { flex: 1; min-height: 0; max-width: 90%; object-fit: contain; }
-.sign-logo h1 { margin: 0; font-size: 1.3rem; text-align: center; }
+.sign-logo h1 {
+  margin: 0;
+  padding: 0.2rem 1rem;
+  border-radius: 999px;
+  background: var(--glass);
+  font-size: 1.3rem;
+  text-align: center;
+}
 
 .pad {
   position: relative;
