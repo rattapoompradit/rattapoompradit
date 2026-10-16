@@ -1,5 +1,7 @@
 (function () {
-  const IDLE_MS = 60_000; // no touch for this long -> back to a clean home screen
+  const IDLE_MS = 60_000; // home: no touch for this long -> clean home screen
+  const SIGN_IDLE_MS = 5 * 60_000; // sign page waits longer: people pose for photos after signing
+  const QUIET_MS = 5_000; // poster page: buttons fade after this long without a touch
   const EXIT_HOLD_MS = 5_000;
 
   const $ = (id) => document.getElementById(id);
@@ -103,27 +105,36 @@
   // ---------- sign page ----------
   const pad = createPad($('pad'), (inked) => {
     padHint.hidden = inked;
+    sign.classList.toggle('inked', inked);
   });
+
+  function setPosterMode(on) {
+    sign.classList.toggle('poster', on);
+    padHint.textContent = on ? 'เซ็นชื่อที่นี่' : 'เซ็นชื่อในกรอบนี้';
+  }
 
   function openSign(item) {
     hideKeyboard();
-    sign.classList.toggle('poster', !!item.poster);
+    setPosterMode(!!item.poster);
     sign.style.setProperty('--poster', `url("${item.url}")`);
-    signImg.onload = () => sign.classList.toggle('poster', isPoster(signImg));
+    signImg.onload = () => setPosterMode(isPoster(signImg));
     signImg.src = item.url;
     home.hidden = true;
     sign.hidden = false;
     pad.clear();
+    poke();
   }
 
   function goHome() {
     pad.clear();
     sign.hidden = true;
     home.hidden = false;
+    poke();
   }
 
-  $('btn-clear').addEventListener('click', () => pad.clear());
-  $('btn-back').addEventListener('click', goHome);
+  // A palm or second finger landing on a button mid-signature must not clear or leave the page.
+  $('btn-clear').addEventListener('click', () => pad.drawing() || pad.clear());
+  $('btn-back').addEventListener('click', () => pad.drawing() || goHome());
 
   function createPad(canvas, onInk) {
     const ctx = canvas.getContext('2d');
@@ -150,13 +161,13 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.strokeStyle = ctx.fillStyle = getComputedStyle(canvas).color;
       base = Math.min(9, Math.max(3, w / 180));
       active = null;
       setInked(false);
     }
 
-    const lineWidth = (e) => (e.pointerType === 'pen' && e.pressure > 0 ? base * (0.5 + e.pressure) : base);
+    let scale = 1;
+    const lineWidth = (e) => scale * (e.pointerType === 'pen' && e.pressure > 0 ? base * (0.5 + e.pressure) : base);
 
     canvas.addEventListener('pointerdown', (e) => {
       // Only the first finger draws; a resting palm or second finger is ignored.
@@ -164,6 +175,9 @@
       e.preventDefault();
       active = e.pointerId;
       canvas.setPointerCapture(e.pointerId);
+      const style = getComputedStyle(canvas);
+      ctx.strokeStyle = ctx.fillStyle = style.color;
+      scale = parseFloat(style.getPropertyValue('--ink-scale')) || 1;
       const r = canvas.getBoundingClientRect();
       last = mid = { x: e.clientX - r.left, y: e.clientY - r.top };
       ctx.lineWidth = lineWidth(e);
@@ -204,6 +218,7 @@
     new ResizeObserver(resize).observe(canvas);
 
     return {
+      drawing: () => active !== null,
       clear() {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -217,6 +232,7 @@
 
   // ---------- kiosk behaviour ----------
   let idleTimer;
+  let quietTimer;
   function resetAll() {
     goHome();
     hideKeyboard();
@@ -225,7 +241,10 @@
   }
   function poke() {
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(resetAll, IDLE_MS);
+    idleTimer = setTimeout(resetAll, sign.hidden ? IDLE_MS : SIGN_IDLE_MS);
+    sign.classList.remove('quiet');
+    clearTimeout(quietTimer);
+    if (!sign.hidden) quietTimer = setTimeout(() => sign.classList.add('quiet'), QUIET_MS);
   }
   document.addEventListener('pointerdown', poke, true);
   document.addEventListener('keydown', poke, true);

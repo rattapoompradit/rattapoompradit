@@ -132,9 +132,23 @@ module.exports = async function selftest(win, { out, shots }) {
       const z = wc.getZoomFactor();
       const [, winH] = win.getContentSize();
       check('signing box sits below the poster text', pad.y - pad.h / 2 >= winH * 0.66 - 2 * z, `top ${Math.round(pad.y - pad.h / 2)} of ${winH}`);
+      check('poster page: no white box behind the signature',
+        (await js(`getComputedStyle(document.querySelector('#sign .pad')).backgroundColor`)) === 'rgba(0, 0, 0, 0)');
       await draw('#pad');
       check('poster page: stroke draws', (await inkPixels()) > 0);
+      check('poster page: guide line hides once signing starts', await js(`getComputedStyle(document.querySelector('#sign .pad-line')).display === 'none'`));
+      check('poster page: white ink', (await js(`getComputedStyle(document.getElementById('pad')).color`)) === 'rgb(255, 255, 255)');
+      const btn = await rect('#btn-back');
+      const [winW] = win.getContentSize();
+      check('poster page: buttons are small, bottom-right', btn.x > winW * 0.6 && btn.y > winH * 0.85 && btn.w < winW * 0.3,
+        `${Math.round(btn.w)}px wide at ${Math.round(btn.x)},${Math.round(btn.y)}`);
       await shot('4-sign-poster');
+      await sleep(5600);
+      check('poster page: buttons fade after 5 s without touch', await js(`document.getElementById('sign').classList.contains('quiet')`));
+      await shot('5-sign-poster-quiet');
+      await tap('#btn-clear');
+      check('poster page: ลบ still works on faded buttons', (await inkPixels()) === 0);
+      check('poster page: a touch brings the buttons back', !(await js(`document.getElementById('sign').classList.contains('quiet')`)));
       await tap('#btn-back');
       check('poster page: กลับ returns home', await visible('#home'));
     }
