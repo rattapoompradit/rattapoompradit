@@ -259,34 +259,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 1.8rem;
+  bottom: 1.2rem;
   justify-content: center;
-  gap: 2.6rem;
-  transition: opacity 0.6s;
+  gap: 2rem;
+  opacity: 0.6;
+  transition: opacity 0.8s;
   pointer-events: none; /* the strip between the buttons still belongs to the signature */
 }
-#sign.poster.quiet .actions { opacity: 0.3; }
+#sign.poster.quiet .actions { opacity: 0.12; } /* nearly invisible in photos */
 #sign.poster .btn {
   flex: none;
-  width: 4rem;
-  height: 4rem;
+  width: 2.6rem;
+  height: 2.6rem;
   min-height: 0;
   padding: 0;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: rgb(255 255 255 / 0.16);
-  border: 2px solid rgb(255 255 255 / 0.6);
-  backdrop-filter: blur(6px);
+  background: rgb(255 255 255 / 0.08);
+  border: 1.5px solid rgb(255 255 255 / 0.5);
   pointer-events: auto;
 }
 #sign.poster .btn .ico {
   display: block;
-  width: 46%;
-  height: 46%;
+  width: 48%;
+  height: 48%;
   fill: none;
   stroke: #fff;
-  stroke-width: 2;
+  stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

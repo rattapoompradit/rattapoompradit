@@ -165,7 +165,7 @@ module.exports = async function selftest(win, { out, shots }) {
         await js(`[...document.querySelectorAll('#sign .btn')].every(b => getComputedStyle(b.querySelector('.ico')).display !== 'none' && getComputedStyle(b.querySelector('.txt')).display === 'none')`));
       await shot('4-sign-poster');
       await sleep(5600);
-      check('poster page: buttons fade after 5 s without touch', await js(`document.getElementById('sign').classList.contains('quiet')`));
+      check('poster page: buttons fade after 3 s without touch', await js(`document.getElementById('sign').classList.contains('quiet')`));
       await shot('5-sign-poster-quiet');
       await tap('#btn-clear');
       check('poster page: ลบ still works on faded buttons', (await inkPixels()) === 0);

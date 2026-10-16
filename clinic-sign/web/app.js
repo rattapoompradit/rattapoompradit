@@ -1,7 +1,7 @@
 (function () {
   const IDLE_MS = 60_000; // home: no touch for this long -> clean home screen
   const SIGN_IDLE_MS = 5 * 60_000; // sign page waits longer: people pose for photos after signing
-  const QUIET_MS = 5_000; // poster page: buttons fade after this long without a touch
+  const QUIET_MS = 3_000; // poster page: buttons fade after this long without a touch
   const EXIT_HOLD_MS = 5_000;
 
   const $ = (id) => document.getElementById(id);
