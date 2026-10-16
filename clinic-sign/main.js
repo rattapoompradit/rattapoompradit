@@ -31,6 +31,25 @@ function fileUrl(full) {
   return `${pathToFileURL(full).href}?v=${Math.round(fs.statSync(full).mtimeMs)}`;
 }
 
+// Default videos shipped with the app (resources/media in the installer, ./media when run from
+// source). A _background / _screensaver file in the logo folder always wins.
+const mediaDir = app.isPackaged ? path.join(process.resourcesPath, 'media') : path.join(__dirname, 'media');
+
+function bundledMedia() {
+  const found = {};
+  let entries = [];
+  try {
+    entries = fs.readdirSync(mediaDir);
+  } catch {
+    return found;
+  }
+  for (const name of entries) {
+    const role = specialFile(name);
+    if (role && (!found[role.role] || role.video)) found[role.role] = { url: fileUrl(path.join(mediaDir, name)), video: role.video };
+  }
+  return found;
+}
+
 function listLogos(dir) {
   const items = [];
   const special = {};
@@ -52,7 +71,13 @@ function listLogos(dir) {
     const parsed = parseLogoFile(entry.name);
     if (parsed) items.push({ ...parsed, url: fileUrl(full) });
   }
-  return { dir, items: sortLogos(items), background: special.background || null, screensaver: special.screensaver || null };
+  const bundled = flag('no-bundled-media') ? {} : bundledMedia();
+  return {
+    dir,
+    items: sortLogos(items),
+    background: special.background || bundled.background || null,
+    screensaver: special.screensaver || bundled.screensaver || null,
+  };
 }
 
 function watchLogos(dir) {

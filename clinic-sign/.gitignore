@@ -2,3 +2,5 @@ node_modules/
 dist/
 selftest.txt
 shots/
+media/*.mp4
+media/*.webm

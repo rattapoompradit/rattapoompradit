@@ -29,7 +29,17 @@
       "artifactName": "ClinicSign-Setup.exe",
       "createDesktopShortcut": true,
       "runAfterFinish": true
-    }
+    },
+    "extraResources": [
+      {
+        "from": "media",
+        "to": "media",
+        "filter": [
+          "_background.*",
+          "_screensaver.*"
+        ]
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^44.7.2",

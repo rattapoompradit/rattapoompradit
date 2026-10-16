@@ -140,16 +140,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--muted);
 }
 
-.count {
-  display: inline-block;
-  margin: 0.5rem 0 0;
-  padding: 0.15rem 0.8rem;
-  border-radius: 999px;
-  background: var(--glass);
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
 .grid {
   flex: 1;
   overflow-y: auto;

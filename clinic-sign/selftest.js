@@ -94,8 +94,8 @@ module.exports = async function selftest(win, { out, shots }) {
     );
     const bgVideo = await js(`!document.getElementById('bg-video').hidden`);
     if (bgVideo) check('menu background video plays', await waitFor(playing('bg-video')));
-    else {
-      const bg = await js(`document.body.classList.contains('has-bg') && getComputedStyle(document.body).backgroundImage`);
+    else if (await js(`document.body.classList.contains('has-bg')`)) {
+      const bg = await js(`getComputedStyle(document.body).backgroundImage`);
       check('background image applied (if _background.* exists)', bg && bg.includes('_background'), String(bg).slice(0, 80));
     }
     await shot('1-home');

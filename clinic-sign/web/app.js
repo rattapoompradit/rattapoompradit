@@ -15,7 +15,6 @@
   const search = $('search');
   const searchClear = $('search-clear');
   const grid = $('grid');
-  const count = $('count');
   const empty = $('empty');
   const kbEl = $('keyboard');
   const signImg = $('sign-img');
@@ -65,7 +64,6 @@
       if (!t.el.hidden) shown++;
     }
     searchClear.hidden = !q;
-    count.textContent = q.trim() ? `พบ ${shown} จาก ${logos.length} คลินิก` : `${logos.length} คลินิก`;
     if (!logos.length) {
       empty.textContent = `ยังไม่มีโลโก้ — ใส่ไฟล์รูปในโฟลเดอร์ ${dir} (ชื่อไฟล์ = ชื่อคลินิก)`;
     } else {
