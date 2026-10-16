@@ -12,7 +12,6 @@
   const empty = $('empty');
   const kbEl = $('keyboard');
   const signImg = $('sign-img');
-  const signName = $('sign-name');
   const padHint = $('pad-hint');
 
   let logos = [];
@@ -31,9 +30,8 @@
       img.loading = 'lazy';
       img.decoding = 'async';
       img.draggable = false;
-      const label = document.createElement('span');
-      label.textContent = item.name;
-      b.append(img, label);
+      b.setAttribute('aria-label', item.name);
+      b.append(img);
       b.addEventListener('click', () => openSign(item));
       return { el: b, name: item.name };
     });
@@ -99,7 +97,6 @@
   function openSign(item) {
     hideKeyboard();
     signImg.src = item.url;
-    signName.textContent = item.name;
     home.hidden = true;
     sign.hidden = false;
     pad.clear();
