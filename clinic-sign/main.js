@@ -101,6 +101,15 @@ function createWindow() {
     }
   });
 
+  // Lay out as if the short side were 1080 px: a 4K screen at 100% Windows scaling then looks
+  // like Full HD (only sharper) instead of tiny text and buttons.
+  const fit = () => {
+    const [cw, ch] = w.getContentSize();
+    wc.setZoomFactor(Math.min(4, Math.max(0.5, Math.min(cw, ch) / 1080)));
+  };
+  wc.on('did-finish-load', fit);
+  w.on('resize', fit);
+
   w.once('ready-to-show', () => w.show());
   w.loadFile(path.join(__dirname, 'web', 'index.html'));
   return w;

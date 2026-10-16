@@ -26,9 +26,13 @@ module.exports = async function selftest(win, { out, shots }) {
     }
     return v;
   }
-  const rect = (sel) =>
-    js(`(() => { const r = document.querySelector(${q(sel)}).getBoundingClientRect();
+  // Page coordinates are CSS px; input events are window px, which differ by the zoom factor.
+  const rect = async (sel) => {
+    const z = wc.getZoomFactor();
+    const r = await js(`(() => { const r = document.querySelector(${q(sel)}).getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; })()`);
+    return { x: r.x * z, y: r.y * z, w: r.w * z, h: r.h * z };
+  };
   const mouse = (type, x, y) =>
     wc.sendInputEvent({ type, x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1 });
   async function tap(sel) {
@@ -65,6 +69,7 @@ module.exports = async function selftest(win, { out, shots }) {
   async function shot(name) {
     if (!shots) return;
     fs.mkdirSync(shots, { recursive: true });
+    await sleep(400); // let freshly decoded images paint
     fs.writeFileSync(path.join(shots, `${name}.png`), (await wc.capturePage()).toPNG());
   }
 

@@ -48,6 +48,7 @@
 ## ตั้งค่า Windows + จอ LG แนวตั้ง (ทำครั้งเดียว)
 
 1. **หมุนจอ:** Settings → System → Display → Display orientation → **Portrait**
+   รองรับทั้ง Full HD (1080×1920) และ 4K (2160×3840) — โปรแกรมขยายเองให้พอดีจอ ตั้ง Scale ของ Windows เท่าไรก็ได้
 2. **ตั้งทัชให้ตรงหลังหมุนจอ** (สำคัญ — ถ้าข้ามขั้นนี้ แตะแล้วจะไม่ตรงจุด):
    Control Panel → **Tablet PC Settings** → Setup… → เลือก **Touch input** แล้วแตะจอที่มีข้อความขึ้น
    ถ้ายังเพี้ยน กด Calibrate… ในหน้าเดียวกัน
