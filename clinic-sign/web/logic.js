@@ -17,10 +17,16 @@
     return { name, order };
   }
 
-  // "_background.jpg" in the logo folder is the page background, not a clinic.
-  function isBackgroundFile(file) {
-    const dot = file.lastIndexOf('.');
-    return /^_background\./i.test(file) && IMAGE_EXT.includes(file.slice(dot).toLowerCase());
+  const VIDEO_EXT = ['.mp4', '.webm', '.m4v'];
+
+  // "_background.jpg|.mp4" is the menu background and "_screensaver.mp4|.jpg" the screensaver;
+  // neither is a clinic. Returns { role, video } or null.
+  function specialFile(file) {
+    const m = /^_(background|screensaver)(\.[^.]+)$/i.exec(file);
+    if (!m) return null;
+    const ext = m[2].toLowerCase();
+    const video = VIDEO_EXT.includes(ext);
+    return video || IMAGE_EXT.includes(ext) ? { role: m[1].toLowerCase(), video } : null;
   }
 
   function sortLogos(items) {
@@ -38,7 +44,7 @@
     return !q || searchKey(name).includes(q);
   }
 
-  const api = { IMAGE_EXT, parseLogoFile, isBackgroundFile, sortLogos, searchKey, matches };
+  const api = { IMAGE_EXT, VIDEO_EXT, parseLogoFile, specialFile, sortLogos, searchKey, matches };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else Object.assign(root, api);
 })(typeof window !== 'undefined' ? window : globalThis);

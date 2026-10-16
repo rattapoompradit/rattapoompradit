@@ -73,15 +73,31 @@ module.exports = async function selftest(win, { out, shots }) {
     fs.writeFileSync(path.join(shots, `${name}.png`), (await wc.capturePage()).toPNG());
   }
 
+  const playing = (id) => `(() => { const v = document.getElementById('${id}');
+    return !v.hidden && v.readyState >= 2 && !v.paused && v.currentTime > 0; })()`;
+
   try {
+    const hasSaver = await waitFor(`!document.getElementById('saver').hidden`, Boolean, 4000);
+    if (hasSaver) {
+      check('starts on the screensaver', true);
+      check('screensaver video plays', await waitFor(playing('saver-video')));
+      await shot('0-saver');
+      await tap('#saver');
+      check('tap screensaver opens the clinic menu', (await visible('#home')) && !(await visible('#saver')));
+      check('screensaver video pauses off-screen', await js(`document.getElementById('saver-video').paused`));
+    }
     const total = await waitFor(`document.querySelectorAll('.tile').length`, (n) => n > 0);
     check('logos listed', total > 0, `${total} tiles`);
     check(
       'logo images load',
       await waitFor(`[...document.querySelectorAll('.tile img')].every(i => i.complete && i.naturalWidth > 0)`),
     );
-    const bg = await js(`document.body.classList.contains('has-bg') && getComputedStyle(document.body).backgroundImage`);
-    check('background image applied (if _background.* exists)', bg && bg.includes('_background'), String(bg).slice(0, 80));
+    const bgVideo = await js(`!document.getElementById('bg-video').hidden`);
+    if (bgVideo) check('menu background video plays', await waitFor(playing('bg-video')));
+    else {
+      const bg = await js(`document.body.classList.contains('has-bg') && getComputedStyle(document.body).backgroundImage`);
+      check('background image applied (if _background.* exists)', bg && bg.includes('_background'), String(bg).slice(0, 80));
+    }
     await shot('1-home');
 
     await tap('#search');
@@ -138,10 +154,15 @@ module.exports = async function selftest(win, { out, shots }) {
       check('poster page: stroke draws', (await inkPixels()) > 0);
       check('poster page: guide line hides once signing starts', await js(`getComputedStyle(document.querySelector('#sign .pad-line')).display === 'none'`));
       check('poster page: white ink', (await js(`getComputedStyle(document.getElementById('pad')).color`)) === 'rgb(255, 255, 255)');
-      const btn = await rect('#btn-back');
+      const back = await rect('#btn-back');
+      const clear = await rect('#btn-clear');
       const [winW] = win.getContentSize();
-      check('poster page: buttons are small, bottom-right', btn.x > winW * 0.6 && btn.y > winH * 0.85 && btn.w < winW * 0.3,
-        `${Math.round(btn.w)}px wide at ${Math.round(btn.x)},${Math.round(btn.y)}`);
+      const mid = (back.x + clear.x) / 2;
+      check('poster page: small icon buttons centred at the bottom',
+        Math.abs(mid - winW / 2) < winW * 0.03 && back.y > winH * 0.85 && back.w < winW * 0.15 && clear.x < back.x,
+        `${Math.round(back.w)}px, centre ${Math.round(mid)} of ${winW}`);
+      check('poster page: icons shown, text hidden',
+        await js(`[...document.querySelectorAll('#sign .btn')].every(b => getComputedStyle(b.querySelector('.ico')).display !== 'none' && getComputedStyle(b.querySelector('.txt')).display === 'none')`));
       await shot('4-sign-poster');
       await sleep(5600);
       check('poster page: buttons fade after 5 s without touch', await js(`document.getElementById('sign').classList.contains('quiet')`));
@@ -151,6 +172,15 @@ module.exports = async function selftest(win, { out, shots }) {
       check('poster page: a touch brings the buttons back', !(await js(`document.getElementById('sign').classList.contains('quiet')`)));
       await tap('#btn-back');
       check('poster page: กลับ returns home', await visible('#home'));
+    }
+
+    if (hasSaver) {
+      check('menu shows the screensaver button', await visible('#to-saver'));
+      await tap('#to-saver');
+      check('screensaver button goes to the screensaver', (await visible('#saver')) && (await waitFor(playing('saver-video'))));
+      check('menu video pauses on the screensaver', await js(`document.getElementById('bg-video').paused`));
+      await tap('#saver');
+      check('back to the menu from the screensaver', await visible('#home'));
     }
   } catch (e) {
     check('selftest ran to the end', false, e && e.stack);

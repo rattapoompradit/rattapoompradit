@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseLogoFile, isBackgroundFile, sortLogos, matches } = require('../web/logic.js');
+const { parseLogoFile, specialFile, sortLogos, matches } = require('../web/logic.js');
 const { TH } = require('../web/keyboard.js');
 
 test('file name becomes clinic name; number prefix sets order', () => {
@@ -10,12 +10,15 @@ test('file name becomes clinic name; number prefix sets order', () => {
   assert.equal(parseLogoFile('1234.png').name, '1234');
 });
 
-test('_background.* is the background, never a clinic', () => {
-  for (const f of ['_background.jpg', '_Background.PNG', '_background.webp']) {
-    assert.ok(isBackgroundFile(f), f);
-    assert.equal(parseLogoFile(f), null, f);
+test('_background.* / _screensaver.* are special files, never clinics', () => {
+  assert.deepEqual(specialFile('_background.jpg'), { role: 'background', video: false });
+  assert.deepEqual(specialFile('_Background.MP4'), { role: 'background', video: true });
+  assert.deepEqual(specialFile('_screensaver.mp4'), { role: 'screensaver', video: true });
+  assert.deepEqual(specialFile('_screensaver.webp'), { role: 'screensaver', video: false });
+  for (const f of ['_background.jpg', '_screensaver.mp4', '_background.webm']) assert.equal(parseLogoFile(f), null, f);
+  for (const f of ['_background.txt', 'background.jpg', '_bg.jpg', '_screensaver.mov', '_background.old.jpg']) {
+    assert.equal(specialFile(f), null, f);
   }
-  for (const f of ['_background.txt', 'background.jpg', '_bg.jpg']) assert.ok(!isBackgroundFile(f), f);
 });
 
 test('non-image and hidden files are skipped', () => {

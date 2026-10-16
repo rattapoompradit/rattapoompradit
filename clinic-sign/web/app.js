@@ -5,7 +5,12 @@
   const EXIT_HOLD_MS = 5_000;
 
   const $ = (id) => document.getElementById(id);
+  const saver = $('saver');
+  const saverVideo = $('saver-video');
+  const saverImg = $('saver-img');
   const home = $('home');
+  const bgVideo = $('bg-video');
+  const toSaver = $('to-saver');
   const sign = $('sign');
   const search = $('search');
   const searchClear = $('search-clear');
@@ -119,18 +124,42 @@
     sign.style.setProperty('--poster', `url("${item.url}")`);
     signImg.onload = () => setPosterMode(isPoster(signImg));
     signImg.src = item.url;
-    home.hidden = true;
-    sign.hidden = false;
     pad.clear();
-    poke();
+    showPage(sign);
   }
 
   function goHome() {
     pad.clear();
-    sign.hidden = true;
-    home.hidden = false;
+    showPage(home);
+  }
+
+  // ---------- pages + screensaver ----------
+  let saverMedia = null;
+
+  // Only the visible page's video plays.
+  function playIf(video, on) {
+    if (on && !video.hidden) video.play().catch(() => {});
+    else video.pause();
+  }
+
+  function showPage(page) {
+    for (const p of [saver, home, sign]) p.hidden = p !== page;
+    playIf(bgVideo, page === home);
+    playIf(saverVideo, page === saver);
     poke();
   }
+
+  function setVideo(video, media) {
+    const url = media && media.video ? media.url : '';
+    if (video.dataset.url === url) return;
+    video.dataset.url = url;
+    video.hidden = !url;
+    if (url) video.src = url;
+    else video.removeAttribute('src');
+  }
+
+  saver.addEventListener('click', goHome);
+  toSaver.addEventListener('click', () => resetAll());
 
   // A palm or second finger landing on a button mid-signature must not clear or leave the page.
   $('btn-clear').addEventListener('click', () => pad.drawing() || pad.clear());
@@ -233,15 +262,17 @@
   // ---------- kiosk behaviour ----------
   let idleTimer;
   let quietTimer;
+  // Clean slate; with a screensaver file present that is the screensaver, otherwise the menu.
   function resetAll() {
-    goHome();
     hideKeyboard();
     keyboard.reset();
     setQuery('');
+    pad.clear();
+    showPage(saverMedia ? saver : home);
   }
   function poke() {
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(resetAll, sign.hidden ? IDLE_MS : SIGN_IDLE_MS);
+    if (saver.hidden) idleTimer = setTimeout(resetAll, sign.hidden ? IDLE_MS : SIGN_IDLE_MS);
     sign.classList.remove('quiet');
     clearTimeout(quietTimer);
     if (!sign.hidden) quietTimer = setTimeout(() => sign.classList.add('quiet'), QUIET_MS);
@@ -270,10 +301,25 @@
   }
 
   // ---------- logos ----------
-  function applyBackground(url) {
-    document.body.classList.toggle('has-bg', !!url);
-    if (url) document.body.style.setProperty('--bg-image', `url("${url}")`);
+  function applyBackground(bg) {
+    const image = bg && !bg.video ? bg.url : null;
+    document.body.classList.toggle('has-bg', !!bg);
+    if (image) document.body.style.setProperty('--bg-image', `url("${image}")`);
     else document.body.style.removeProperty('--bg-image');
+    setVideo(bgVideo, bg);
+    playIf(bgVideo, !home.hidden);
+  }
+
+  function applySaver(media) {
+    saverMedia = media;
+    setVideo(saverVideo, media);
+    saverImg.hidden = !media || media.video;
+    if (media && !media.video) saverImg.src = media.url;
+    toSaver.hidden = !media;
+    if (!saver.hidden) {
+      if (media) playIf(saverVideo, true);
+      else showPage(home);
+    }
   }
 
   let loaded = null;
@@ -283,10 +329,13 @@
       // The folder watcher also fires when a file is only read (access time); skip if nothing changed.
       const signature = JSON.stringify(res);
       if (signature === loaded) return;
+      const first = loaded === null;
       loaded = signature;
       dir = res.dir;
       logos = res.items;
       applyBackground(res.background);
+      applySaver(res.screensaver);
+      if (first && saverMedia) showPage(saver); // start on the screensaver
     } else {
       dir = '(เปิดผ่านโปรแกรม ClinicSign เท่านั้น)';
     }

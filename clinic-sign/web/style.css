@@ -56,7 +56,53 @@ button { font: inherit; color: inherit; cursor: pointer; }
   z-index: 10;
 }
 
+/* ---------- screensaver + video backgrounds ---------- */
+.fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#saver { position: relative; background: #000; }
+.saver-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10vh;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.5rem 1.8rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.28); /* readable on light and dark videos alike */
+  color: #fff;
+  font-size: 1.6rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  animation: pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes pulse { 50% { opacity: 0.4; } }
+
+#home { position: relative; isolation: isolate; }
+.bg-video { z-index: -1; pointer-events: none; }
+
 /* ---------- home ---------- */
+.search-row { display: flex; align-items: center; gap: 0.6rem; }
+.search-row .search-box { flex: 1; min-width: 0; }
+.round-btn {
+  flex: none;
+  width: clamp(56px, 7vmin, 96px);
+  height: clamp(56px, 7vmin, 96px);
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.round-btn svg { width: 45%; height: 45%; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.round-btn:active { transform: scale(0.94); }
+
 .search-bar {
   padding: var(--gap) var(--gap) calc(var(--gap) / 2);
 }
@@ -137,7 +183,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 /* Poster template (1080x1920): white circle centred at (540, 687.5), 636 px across.
    Crop 632 px of it so no teal fringe shows: width 1080/632, offsets (540-316)/632 and (687.5-316)/632. */
-.tile.poster .logo { border-radius: 50%; }
+.tile.poster .logo { border-radius: 50%; box-shadow: 0 4px 18px rgb(0 0 0 / 0.14); }
 .tile.poster img {
   position: absolute;
   width: 170.886%;
@@ -208,28 +254,43 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #sign.poster .pad-hint { color: rgb(255 255 255 / 0.55); font-size: 1.4rem; }
 #sign.poster .pad-line { border-bottom: 2px solid rgb(255 255 255 / 0.35); bottom: 34%; }
 #sign.poster.inked .pad-line { display: none; } /* only the signature shows in photos */
-/* Small see-through buttons in the bottom-right corner, out of the way of photos. */
+/* Small see-through icon buttons (trash = ลบ, house = กลับ) centred at the bottom. */
 #sign.poster .actions {
   position: absolute;
-  right: var(--gap);
-  bottom: var(--gap);
-  gap: 1.6rem;
+  left: 0;
+  right: 0;
+  bottom: 1.8rem;
+  justify-content: center;
+  gap: 2.6rem;
   transition: opacity 0.6s;
+  pointer-events: none; /* the strip between the buttons still belongs to the signature */
 }
 #sign.poster.quiet .actions { opacity: 0.3; }
 #sign.poster .btn {
   flex: none;
-  min-width: 5.5rem;
-  min-height: clamp(44px, 6vmin, 80px);
-  padding: 0 1.1rem;
-  border-radius: 999px;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #fff;
+  width: 4rem;
+  height: 4rem;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
   background: rgb(255 255 255 / 0.16);
-  border: 2px solid rgb(255 255 255 / 0.55);
+  border: 2px solid rgb(255 255 255 / 0.6);
   backdrop-filter: blur(6px);
+  pointer-events: auto;
 }
+#sign.poster .btn .ico {
+  display: block;
+  width: 46%;
+  height: 46%;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#sign.poster .btn .txt { display: none; }
 
 .sign-logo {
   flex: 0 0 30vh;
@@ -285,5 +346,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-weight: 700;
 }
 .btn:active { transform: scale(0.98); }
+.btn .ico { display: none; }
 .btn-clear { background: var(--card); color: var(--danger); border: 3px solid var(--danger); }
 .btn-back { background: var(--accent); color: var(--accent-text); border: 3px solid var(--accent); }

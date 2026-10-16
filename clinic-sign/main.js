@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, powerSaveBlocker } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { parseLogoFile, isBackgroundFile, sortLogos } = require('./web/logic.js');
+const { parseLogoFile, specialFile, sortLogos } = require('./web/logic.js');
 
 const args = process.argv.slice(1);
 const flag = (name) => args.includes(`--${name}`);
@@ -15,6 +15,7 @@ const selftest = flag('selftest');
 const windowed = flag('windowed') || selftest;
 
 app.commandLine.appendSwitch('disable-pinch');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('overscroll-history-navigation', '0');
 
 let win = null;
@@ -32,24 +33,26 @@ function fileUrl(full) {
 
 function listLogos(dir) {
   const items = [];
-  let background = null;
+  const special = {};
   let entries = [];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
-    return { dir, items, background };
+    entries = [];
   }
   for (const entry of entries) {
     if (!entry.isFile()) continue;
     const full = path.join(dir, entry.name);
-    if (isBackgroundFile(entry.name)) {
-      background = fileUrl(full);
+    const role = specialFile(entry.name);
+    if (role) {
+      // A video wins over an image for the same role.
+      if (!special[role.role] || role.video) special[role.role] = { url: fileUrl(full), video: role.video };
       continue;
     }
     const parsed = parseLogoFile(entry.name);
     if (parsed) items.push({ ...parsed, url: fileUrl(full) });
   }
-  return { dir, items: sortLogos(items), background };
+  return { dir, items: sortLogos(items), background: special.background || null, screensaver: special.screensaver || null };
 }
 
 function watchLogos(dir) {
