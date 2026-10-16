@@ -123,6 +123,21 @@ module.exports = async function selftest(win, { out, shots }) {
     await tap('.tile:not([hidden])');
     check('next signer starts with empty pad', (await inkPixels()) === 0);
     await tap('#btn-back');
+
+    const posters = await waitFor(`document.querySelectorAll('.tile.poster').length`, (n) => n > 0, 5000);
+    if (posters > 0) {
+      await tap('.tile.poster');
+      check('poster opens full-page sign layout', await js(`document.getElementById('sign').classList.contains('poster')`));
+      const pad = await rect('#pad');
+      const z = wc.getZoomFactor();
+      const [, winH] = win.getContentSize();
+      check('signing box sits below the poster text', pad.y - pad.h / 2 >= winH * 0.66 - 2 * z, `top ${Math.round(pad.y - pad.h / 2)} of ${winH}`);
+      await draw('#pad');
+      check('poster page: stroke draws', (await inkPixels()) > 0);
+      await shot('4-sign-poster');
+      await tap('#btn-back');
+      check('poster page: กลับ returns home', await visible('#home'));
+    }
   } catch (e) {
     check('selftest ran to the end', false, e && e.stack);
   }

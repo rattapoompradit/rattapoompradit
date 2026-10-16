@@ -123,11 +123,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
   min-width: 0;
 }
 .tile:active { transform: scale(0.94); opacity: 0.8; }
+.tile .logo {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
 .tile img {
   width: 100%;
-  aspect-ratio: 1;
+  height: 100%;
   object-fit: contain;
   pointer-events: none;
+}
+/* Poster template (1080x1920): white circle centred at (540, 687.5), 636 px across.
+   Crop 632 px of it so no teal fringe shows: width 1080/632, offsets (540-316)/632 and (687.5-316)/632. */
+.tile.poster .logo { border-radius: 50%; }
+.tile.poster img {
+  position: absolute;
+  width: 170.886%;
+  height: auto;
+  max-width: none;
+  left: -35.443%;
+  top: -58.782%;
 }
 .empty {
   margin: var(--gap) var(--gap) auto;
@@ -167,6 +184,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- sign ---------- */
 #sign { padding: var(--gap); gap: var(--gap); }
+
+/* Poster: the whole poster fills the page; signing box and buttons sit below "SKIN READY."
+   (its text ends at y=1242 of 1920, i.e. 65%). */
+#sign.poster {
+  background: var(--poster) center top / cover no-repeat, var(--bg);
+  padding-top: 67vh;
+}
+#sign.poster .sign-logo { display: none; }
+#sign.poster .pad { border-style: solid; border-color: rgb(255 255 255 / 0.6); }
 
 .sign-logo {
   flex: 0 0 30vh;

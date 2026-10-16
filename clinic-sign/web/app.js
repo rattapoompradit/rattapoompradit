@@ -19,6 +19,10 @@
   let dir = '';
 
   // ---------- home: logo grid + search ----------
+  // A 9:16 image is a clinic poster (REVIVE template): the home button is its white circle and
+  // the sign page shows the whole poster. Anything else is a plain logo shown as is.
+  const isPoster = (img) => img.naturalWidth > 0 && img.naturalHeight / img.naturalWidth >= 1.5;
+
   function buildTiles() {
     tiles = logos.map((item) => {
       const b = document.createElement('button');
@@ -30,8 +34,15 @@
       img.loading = 'lazy';
       img.decoding = 'async';
       img.draggable = false;
+      img.addEventListener('load', () => {
+        item.poster = isPoster(img);
+        b.classList.toggle('poster', item.poster);
+      });
+      const logo = document.createElement('span');
+      logo.className = 'logo';
+      logo.append(img);
       b.setAttribute('aria-label', item.name);
-      b.append(img);
+      b.append(logo);
       b.addEventListener('click', () => openSign(item));
       return { el: b, name: item.name };
     });
@@ -96,6 +107,9 @@
 
   function openSign(item) {
     hideKeyboard();
+    sign.classList.toggle('poster', !!item.poster);
+    sign.style.setProperty('--poster', `url("${item.url}")`);
+    signImg.onload = () => sign.classList.toggle('poster', isPoster(signImg));
     signImg.src = item.url;
     home.hidden = true;
     sign.hidden = false;
